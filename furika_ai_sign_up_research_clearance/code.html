@@ -1,0 +1,324 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_blank" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary": "#ffffff",
+          "error-container": "#ffdad6",
+          "background": "#f8f9ff",
+          "primary-fixed-dim": "#6cd3f7",
+          "on-surface": "#0b1c30",
+          "on-tertiary-fixed-variant": "#004d62",
+          "tertiary-fixed-dim": "#91cfea",
+          "secondary-fixed": "#b9eaff",
+          "on-background": "#0b1c30",
+          "on-secondary-fixed-variant": "#004d62",
+          "on-secondary-container": "#00647d",
+          "surface-bright": "#f8f9ff",
+          "primary-fixed": "#b7eaff",
+          "surface-variant": "#d3e4fe",
+          "outline": "#6e797e",
+          "on-tertiary-fixed": "#001f29",
+          "inverse-surface": "#213145",
+          "on-error": "#ffffff",
+          "on-secondary-fixed": "#001f29",
+          "surface-container": "#e5eeff",
+          "on-primary-container": "#fafdff",
+          "error": "#ba1a1a",
+          "on-surface-variant": "#3e484d",
+          "surface-container-low": "#eff4ff",
+          "on-tertiary-container": "#fafdff",
+          "on-error-container": "#93000a",
+          "surface-container-lowest": "#ffffff",
+          "outline-variant": "#bdc8ce",
+          "tertiary-container": "#3c7c94",
+          "on-tertiary": "#ffffff",
+          "tertiary": "#1d637a",
+          "inverse-on-surface": "#eaf1ff",
+          "on-primary-fixed-variant": "#004e61",
+          "surface-dim": "#cbdbf5",
+          "surface-container-high": "#dce9ff",
+          "secondary-fixed-dim": "#81d1f0",
+          "primary": "#00647c",
+          "on-primary-fixed": "#001f28",
+          "tertiary-fixed": "#baeaff",
+          "on-secondary": "#ffffff",
+          "surface-tint": "#006780",
+          "secondary-container": "#8fdfff",
+          "surface-container-highest": "#d3e4fe",
+          "inverse-primary": "#6cd3f7",
+          "secondary": "#006781",
+          "surface": "#f8f9ff",
+          "primary-container": "#007f9d"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter-lg": "1.5rem",
+          "margin-lg": "2rem",
+          "gutter": "1rem",
+          "space-2xs": "0.125rem",
+          "margin": "1rem",
+          "space-sm": "0.5rem",
+          "space-md": "0.75rem",
+          "margin-md": "1.5rem",
+          "space-lg": "1rem",
+          "space-xl": "1.5rem",
+          "space-xs": "0.25rem",
+          "space-2xl": "2rem"
+        },
+        "fontFamily": {
+          "headline-sm": [
+            "Inter"
+          ],
+          "body-sm": [
+            "Inter"
+          ],
+          "label-md": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Inter"
+          ],
+          "metric-display": [
+            "JetBrains Mono"
+          ],
+          "headline-xl": [
+            "Inter"
+          ],
+          "label-sm": [
+            "JetBrains Mono"
+          ],
+          "body-lg": [
+            "Inter"
+          ],
+          "label-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-lg": [
+            "Inter"
+          ],
+          "body-md": [
+            "Inter"
+          ],
+          "headline-xl-mobile": [
+            "Inter"
+          ]
+        },
+        "fontSize": {
+          "headline-sm": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "fontWeight": "400"
+            }
+          ],
+          "label-md": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "metric-display": [
+            "28px",
+            {
+              "lineHeight": "32px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "headline-xl": [
+            "32px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.025em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.02em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "fontWeight": "400"
+            }
+          ],
+          "label-lg": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "headline-lg": [
+            "24px",
+            {
+              "lineHeight": "32px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-xl-mobile": [
+            "26px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="min-h-screen bg-surface font-body-md text-body-md text-on-surface flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container"><header class="w-full bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="w-full px-margin-lg h-16 flex items-center justify-between"><div class="flex items-center gap-space-md"><div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)]"><span class="material-symbols-outlined text-[20px]">water_drop</span></div><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">FURIKA AI</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Nairobi Basin Hydro-Telemetry</span></div></div><div class="flex items-center gap-space-xs px-space-sm py-space-2xs rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm"><span class="material-symbols-outlined text-[14px] text-primary">verified_user</span><span class="">ISO 27001 · WMO-GRIB2 COMPLIANT</span></div></div></header><main class="w-full flex-1 flex flex-col justify-center items-center px-margin py-space-2xl"><div class="flex flex-col w-full">
+<div class="w-full max-w-md mx-auto py-space-xl"><div class="bg-surface-container-lowest rounded-xl p-space-2xl shadow-md flex flex-col"><div class="flex flex-col items-center text-center mb-space-xl"><div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container mb-space-md shadow-sm"><span class="material-symbols-outlined text-[24px]">water_drop</span></div><h1 class="font-headline-lg text-headline-lg text-on-surface mb-space-2xs tracking-tight">Create your account</h1><p class="font-body-md text-body-md text-on-surface-variant">Access Nairobi flood risk and loss modeling</p></div><form class="flex flex-col gap-space-md" id="researcherSignupForm" onsubmit="event.preventDefault(); handleSignupSubmission();"><div class="flex flex-col gap-space-2xs"><label class="font-label-md text-label-md text-on-surface" for="fullName">Full Name</label><div class="relative"><input class="w-full h-10 px-space-md bg-surface-container-low text-on-surface rounded-lg font-body-md text-body-md placeholder:text-on-surface-variant/60 focus:bg-surface-container-lowest focus:outline-none focus:shadow-[0_0_0_2px_rgba(0,100,124,0.3)] transition-all" id="fullName" placeholder="Dr. Amina Omondi" required="" type="text"><span class="material-symbols-outlined absolute right-space-md top-2.5 text-on-surface-variant text-[20px] pointer-events-none">badge</span></div></div><div class="flex flex-col gap-space-2xs"><label class="font-label-md text-label-md text-on-surface" for="workEmail">Institutional or Work Email</label><div class="relative"><input class="w-full h-10 px-space-md bg-surface-container-low text-on-surface rounded-lg font-body-md text-body-md placeholder:text-on-surface-variant/60 focus:bg-surface-container-lowest focus:outline-none focus:shadow-[0_0_0_2px_rgba(0,100,124,0.3)] transition-all" id="workEmail" placeholder="name@organization.or.ke" required="" type="email"><span class="material-symbols-outlined absolute right-space-md top-2.5 text-on-surface-variant text-[20px] pointer-events-none">mail</span></div></div><div class="flex flex-col gap-space-2xs"><label class="font-label-md text-label-md text-on-surface" for="orgType">Organization or Role</label><div class="relative"><select class="w-full h-10 px-space-md pr-10 bg-surface-container-low text-on-surface rounded-lg font-body-md text-body-md appearance-none focus:bg-surface-container-lowest focus:outline-none focus:shadow-[0_0_0_2px_rgba(0,100,124,0.3)] transition-all cursor-pointer" id="orgType" required=""><option disabled="" selected="" value="">Select organization type...</option><option value="reinsurance">Insurance &amp; Reinsurance</option><option value="disaster-gov">Government &amp; Disaster Agencies</option><option value="academic">Academic &amp; Geospatial Research</option><option value="municipal">City Planning &amp; Infrastructure</option><option value="other">Other Entity</option></select><span class="material-symbols-outlined absolute right-space-md top-2.5 text-on-surface-variant text-[20px] pointer-events-none">unfold_more</span></div></div><div class="flex flex-col gap-space-2xs"><label class="font-label-md text-label-md text-on-surface" for="passwordField">Password</label><div class="relative"><input class="w-full h-10 px-space-md pr-10 bg-surface-container-low text-on-surface rounded-lg font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:shadow-[0_0_0_2px_rgba(0,100,124,0.3)] transition-all" id="passwordField" placeholder="••••••••••••" required="" type="password"><button class="absolute right-space-md top-2.5 text-on-surface-variant hover:text-on-surface" onclick="togglePassVisibility('passwordField', this)" type="button"><span class="material-symbols-outlined text-[20px]">visibility</span></button></div></div><div class="flex items-center gap-space-sm pt-space-xs"><input class="w-4 h-4 rounded text-primary bg-surface focus:ring-primary focus:ring-offset-0 cursor-pointer" id="disclaimerAgree" required="" type="checkbox"><label class="font-body-sm text-body-sm text-on-surface-variant cursor-pointer select-none" for="disclaimerAgree">I agree to the <a href="#terms" class="text-primary hover:underline">Terms of Service</a> and <a href="#privacy" class="text-primary hover:underline">Privacy Policy</a></label></div><button class="w-full mt-space-sm py-space-sm bg-primary text-on-primary rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-space-sm shadow-sm hover:bg-primary-container active:bg-inverse-surface transition-all duration-150 cursor-pointer" type="submit"><span class="">Create Account</span><span class="material-symbols-outlined text-[18px]">arrow_forward</span></button><div class="flex items-center justify-center gap-space-2xs font-body-sm text-body-sm text-on-surface-variant pt-space-xs"><span class="">Already have an account?</span><a class="text-primary font-semibold hover:underline" href="#signin">Sign in</a></div></form></div></div>
+<!-- Inline Interactive Logic (Micro-interactions & Strength Evaluation) -->
+<script>
+    function togglePassVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+      } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+      }
+    }
+
+    function evaluatePasswordStrength(val) {
+      const hasUpper = /[A-Z]/.test(val);
+      const hasLower = /[a-z]/.test(val);
+      const hasNum = /[0-9]/.test(val);
+      const hasLen = val.length >= 10;
+
+      updateReqState('reqUpper', hasUpper);
+      updateReqState('reqLower', hasLower);
+      updateReqState('reqNumber', hasNum);
+      updateReqState('reqLength', hasLen);
+
+      let score = 0;
+      if (hasUpper) score++;
+      if (hasLower) score++;
+      if (hasNum) score++;
+      if (hasLen) score++;
+
+      const b1 = document.getElementById('meterBar1');
+      const b2 = document.getElementById('meterBar2');
+      const b3 = document.getElementById('meterBar3');
+      const b4 = document.getElementById('meterBar4');
+      const label = document.getElementById('strengthLabel');
+
+      [b1, b2, b3, b4].forEach((b, i) => {
+        if (i < score) {
+          b.classList.remove('opacity-30');
+          b.classList.add('opacity-100');
+        } else {
+          b.classList.remove('opacity-100');
+          b.classList.add('opacity-30');
+        }
+      });
+
+      if (score === 0) {
+        label.textContent = 'Awaiting Ingestion';
+        label.className = 'font-label-sm text-label-sm text-on-surface-variant font-bold';
+      } else if (score <= 2) {
+        label.textContent = 'Low Resilience (Insufficient)';
+        label.className = 'font-label-sm text-label-sm text-error font-bold';
+      } else if (score === 3) {
+        label.textContent = 'Medium Resilience (Standard)';
+        label.className = 'font-label-sm text-label-sm text-tertiary font-bold';
+      } else {
+        label.textContent = 'Cryptographic High Resilience (Verified)';
+        label.className = 'font-label-sm text-label-sm text-primary font-bold';
+      }
+    }
+
+    function updateReqState(elementId, isValid) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const icon = el.querySelector('.material-symbols-outlined');
+      if (isValid) {
+        icon.textContent = 'check_circle';
+        icon.classList.remove('text-outline');
+        icon.classList.add('text-primary');
+        el.classList.add('text-on-surface');
+      } else {
+        icon.textContent = 'radio_button_unchecked';
+        icon.classList.remove('text-primary');
+        icon.classList.add('text-outline');
+        el.classList.remove('text-on-surface');
+      }
+    }
+
+    function handleSignupSubmission() {
+      const pass = document.getElementById('passwordField').value;
+      const confirm = document.getElementById('confirmPasswordField').value;
+      
+      if (pass !== confirm) {
+        alert("Verification Failure: Access Keys do not match. Please re-enter.");
+        return;
+      }
+      
+      const formCard = document.getElementById('researcherSignupForm');
+      formCard.innerHTML = `
+        <div class="py-space-2xl px-space-md text-center flex flex-col items-center justify-center animate-fade-in">
+          <div class="w-16 h-16 rounded-full bg-surface-container text-primary flex items-center justify-center mb-space-md">
+            <span class="material-symbols-outlined text-[36px]">hourglass_top</span>
+          </div>
+          <h3 class="font-headline-lg text-headline-lg text-on-surface mb-space-xs">
+            Ingest Protocol Dispatched
+          </h3>
+          <p class="font-body-md text-body-md text-on-surface-variant max-w-md mb-space-lg">
+            Your clearance request for the Nairobi Basin Catastrophe Telemetry Engine has been logged with ID <strong>#FURIKA-KE-` + Math.floor(100000 + Math.random() * 900000) + `</strong>. A verification token has been routed to your institutional inbox.
+          </p>
+          <div class="p-space-md bg-surface-container rounded-lg font-label-sm text-label-sm text-on-surface-variant mb-space-lg">
+            STATION STATUS: DISASTER RISK CLEARANCE REVIEW (SLA: &lt; 4 HOURS)
+          </div>
+          <a href="#" onclick="window.location.reload()" class="px-space-lg py-space-sm bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors">
+            Return to Telemetry Dashboard
+          </a>
+        </div>
+      `;
+    }
+  </script>
+</div></main><footer class="w-full bg-surface-container-low"><div class="w-full px-margin-lg py-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md font-label-sm text-label-sm text-on-surface-variant"><div class="flex items-center gap-space-lg"><span class="">© 2025 FURIKA CLIMATE ANALYTICS LABS</span><span class="hidden md:inline">•</span><span class="font-label-sm text-label-sm">NAIROBI BASIN MODEL v4.2.1-PROD</span></div><div class="flex items-center gap-space-xl"><a class="hover:text-primary transition-colors" href="#">SECURITY PROTOCOL</a><a class="hover:text-primary transition-colors" href="#">HYDROLOGICAL TELEMETRY SPEC</a><a class="hover:text-primary transition-colors" href="#">INSTITUTIONAL ACCESS PRIVILEGES</a></div></div></footer>
+
+</body></html>

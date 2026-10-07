@@ -1,0 +1,23 @@
+{
+  "name": "furika-ai-cat-model",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development node server.mjs",
+    "build": "vite build",
+    "start": "NODE_ENV=production node server.mjs",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "openai": "latest"
+  },
+  "devDependencies": {}
+}

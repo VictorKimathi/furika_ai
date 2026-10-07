@@ -1,0 +1,1 @@
+.right-view-content{position:relative}.right-mode{position:absolute;inset:0;visibility:hidden;pointer-events:none;opacity:0;transition:opacity .18s ease}.right-mode.active{visibility:visible;pointer-events:auto;opacity:1}.right-mode>.map-workspace,.right-mode>.workflow-workspace{height:100%}

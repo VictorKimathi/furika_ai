@@ -1,0 +1,927 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {"darkMode":"class","theme":{"extend":{"colors":{"on-secondary-fixed":"#001f29","surface-container-low":"#eff4ff","primary-container":"#007f9d","tertiary-fixed-dim":"#91cfea","secondary-fixed-dim":"#81d1f0","on-surface-variant":"#3e484d","tertiary-fixed":"#baeaff","on-tertiary-fixed":"#001f29","primary-fixed":"#b7eaff","on-secondary":"#ffffff","surface-dim":"#cbdbf5","secondary-fixed":"#b9eaff","inverse-primary":"#6cd3f7","on-secondary-fixed-variant":"#004d62","primary-fixed-dim":"#6cd3f7","surface":"#f8f9ff","secondary":"#006781","on-tertiary":"#ffffff","inverse-on-surface":"#eaf1ff","background":"#f8f9ff","on-primary":"#ffffff","inverse-surface":"#213145","tertiary-container":"#3c7c94","surface-variant":"#d3e4fe","surface-container-high":"#dce9ff","on-tertiary-fixed-variant":"#004d62","outline":"#6e797e","secondary-container":"#8fdfff","on-background":"#0b1c30","error":"#ba1a1a","surface-bright":"#f8f9ff","on-primary-fixed":"#001f28","on-error-container":"#93000a","on-primary-fixed-variant":"#004e61","on-error":"#ffffff","surface-tint":"#006780","surface-container-highest":"#d3e4fe","outline-variant":"#bdc8ce","on-surface":"#0b1c30","surface-container":"#e5eeff","on-secondary-container":"#00647d","error-container":"#ffdad6","on-tertiary-container":"#fafdff","surface-container-lowest":"#ffffff","primary":"#00647c","on-primary-container":"#fafdff","tertiary":"#1d637a"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-md":"0.75rem","space-xs":"0.25rem","space-xl":"1.5rem","space-2xs":"0.125rem","gutter-lg":"1.5rem","space-lg":"1rem","space-sm":"0.5rem","margin-lg":"2rem","margin-md":"1.5rem","gutter":"1rem","space-2xl":"2rem","margin":"1rem"},"fontFamily":{"label-lg":["JetBrains Mono"],"headline-lg":["Inter"],"body-md":["Inter"],"headline-md":["Inter"],"headline-xl":["Inter"],"label-sm":["JetBrains Mono"],"label-md":["JetBrains Mono"],"metric-display":["JetBrains Mono"],"headline-xl-mobile":["Inter"],"body-lg":["Inter"],"body-sm":["Inter"],"headline-sm":["Inter"]},"fontSize":{"label-lg":["14px",{"lineHeight":"20px","letterSpacing":"-0.01em","fontWeight":"500"}],"headline-lg":["24px",{"lineHeight":"32px","letterSpacing":"-0.02em","fontWeight":"600"}],"body-md":["14px",{"lineHeight":"20px","fontWeight":"400"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}],"headline-xl":["32px",{"lineHeight":"40px","letterSpacing":"-0.025em","fontWeight":"700"}],"label-sm":["10px",{"lineHeight":"14px","letterSpacing":"0.02em","fontWeight":"500"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0em","fontWeight":"500"}],"metric-display":["28px",{"lineHeight":"32px","letterSpacing":"-0.03em","fontWeight":"700"}],"headline-xl-mobile":["26px",{"lineHeight":"34px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"400"}],"body-sm":["12px",{"lineHeight":"16px","fontWeight":"400"}],"headline-sm":["16px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}]}}}};</script></head><body class="bg-background font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container"><header class="fixed top-0 left-0 right-0 h-16 z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md min-w-0 flex-1"><img alt="Furika AI Logo" class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1XWHkBUd8UJnv0ZMDohSNL6FxbfwMFSOz4EWXFzJpeKz93_0VkCNHrjSMIvDNbK_f8XTWplpcGvrrBwiwS0hAUKHo2QcwNA3fnTtUsYZb6dV2-6NBI4_qxZV95MnXojegFzHlwTie3XZla7X9tphJTHdKSW6BrGby8Srd5wCTgof6DPbZpjPXsd26Ci2L1V5hZZL_tx1OyDs-mugGKlN52kjI_c8IjZQw2qVNAapbO5"><div class="flex flex-col min-w-0"><div class="flex items-center gap-space-sm"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight truncate">Furika AI</span><span class="hidden lg:inline text-outline-variant">—</span><span class="hidden lg:inline font-headline-sm text-headline-sm text-on-surface-variant truncate font-normal">Nairobi Catastrophe Risk &amp; Flood Intelligence</span></div><div class="flex items-center gap-space-sm pt-space-2xs"><span class="font-label-sm text-label-sm text-primary uppercase tracking-wider font-semibold">Engine: v4.8 Hydro-Cat</span><span class="text-outline-variant font-label-sm text-label-sm">•</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-[260px] xl:max-w-md">exposure_nairobi_with_hazard.csv (Pipeline: Hazard → Vulnerability → Exposure → Financial Loss)</span></div></div></div><div class="hidden xl:flex items-center gap-space-sm px-space-md py-space-xs rounded bg-surface-container-low shrink-0"><span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span><span class="font-label-md text-label-md text-on-surface font-medium">Models Active: JBA &amp; KMD Basins</span></div><nav class="hidden 2xl:flex items-center gap-space-xs shrink-0" data-active-classes="bg-primary text-on-primary font-medium rounded"><a aria-current="page" class="px-space-md py-space-xs transition-colors bg-primary text-on-primary font-medium rounded" data-path="catastrophe-loss-workspace" href="#">Simulation Canvas</a><a class="px-space-md py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="hydrological-scenarios" href="#">Basin Scenarios</a><a class="px-space-md py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="loss-exceedance-analytics" href="#">Exceedance Curves</a><a class="px-space-md py-space-xs font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="asset-vulnerability-registry" href="#">Asset Vulnerability</a></nav><div class="flex items-center gap-space-md shrink-0"><button class="h-8 px-space-md bg-secondary text-on-secondary font-headline-sm text-body-sm rounded hover:bg-secondary-fixed-dim hover:text-on-secondary-fixed transition-colors flex items-center gap-space-xs" type="button"><span class="material-symbols-outlined text-body-lg">cloud_download</span><span class="hidden md:inline font-medium">Export PML</span></button><div class="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBa1pJUXU6NoLKQHjwPJAvHf2uH1QsejTxM91sx_964Tn7aFgf2HGkpbz7XeFatNk7Wu7b2zWZr6swF-1QavJlHrev5FtDpAItUiSfA07gFwvs0PyGKQNcalxpz3kMgg1QKSmBVzO1k5rur8L6eOJf5wVZUQw41pIS8DjR0j1OMHPPwRVJB7SuINoi4XmT1rVzRmNJM3eesySiFnrDFQGA2i6UXZi4IP7c8AGDS3HKC"><div class="hidden sm:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-semibold leading-tight">Dr. A. Omondi</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Lead Cat Modeler</span></div></div></div></div></header><aside class="fixed left-0 top-16 bottom-0 w-16 bg-surface-container-lowest flex flex-col items-center py-space-md z-40 shadow-[0_1px_8px_rgba(0,0,0,0.04)] justify-between"><div class="flex flex-col items-center gap-space-sm w-full"><button class="w-10 h-10 flex items-center justify-center rounded bg-surface-container-high text-primary hover:bg-primary-container hover:text-on-primary-container transition-all" title="Geospatial Viewport" type="button"><span class="material-symbols-outlined">map</span></button><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Hydrological Layers" type="button"><span class="material-symbols-outlined">layers</span></button><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Return Period Curve" type="button"><span class="material-symbols-outlined">water_loss</span></button><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Financial Exposure Matrix" type="button"><span class="material-symbols-outlined">query_stats</span></button><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="AI Loss Copilot" type="button"><span class="material-symbols-outlined">smart_toy</span></button></div><div class="flex flex-col items-center gap-space-sm w-full"><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Basin Telemetry" type="button"><span class="material-symbols-outlined">tune</span></button><button class="w-10 h-10 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Global Settings" type="button"><span class="material-symbols-outlined">settings</span></button></div></aside><div class="pl-16"><main class="w-full pt-16 bg-background min-h-screen"><div class="flex flex-col w-full">
+<!-- Top Notification Warning Strip -->
+<div class="w-full bg-surface-container-high px-space-md py-space-xs flex items-center justify-between text-body-sm text-on-surface shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="material-symbols-outlined text-secondary text-body-lg shrink-0">warning</span>
+<span class="font-label-md text-label-md text-on-surface truncate">
+<strong>Geospatial Caveat:</strong> Nairobi 0–1 Hazard scores denote topographical susceptibility proxies (HAND/TWI &amp; 30m DEM), not dynamic hydrologic depth gauging. Urban culvert blockages along Mombasa Rd &amp; Outer Ring may deviate.
+      </span>
+</div>
+<div class="flex items-center gap-space-md shrink-0">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-semibold">Active Run: Syn-Port-142</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Synced: KES 4.82B TIV</span>
+</div>
+</div>
+<!-- Mobile View Switcher (Visible on < 1024px) -->
+<div class="flex lg:hidden w-full bg-surface-container-lowest p-space-xs gap-space-xs">
+<button class="flex-1 py-space-xs text-center font-label-md text-label-md rounded bg-primary text-on-primary" id="tabMapBtn" onclick="switchView('map')" type="button">
+      Interactive GIS Map
+    </button>
+<button class="flex-1 py-space-xs text-center font-label-md text-label-md rounded text-on-surface hover:bg-surface-container-low" id="tabChatBtn" onclick="switchView('chat')" type="button">
+      Cat Copilot &amp; Loss Model
+    </button>
+</div>
+<!-- Main Split Layout Container (Edge to Edge 60 / 40 Split) -->
+<div class="w-full flex flex-col lg:flex-row relative" style="height: calc(100vh - 5.75rem);">
+<!-- LEFT PANEL: INTERACTIVE NAIROBI GIS MAP SYSTEM (approx 60%) -->
+<div class="w-full lg:w-[42%] xl:w-[40%] 2xl:w-[38%] h-full flex flex-col bg-surface-container-lowest shadow-md z-30" id="catCopilotPane">
+<!-- Copilot Header Bar -->
+<div class="px-space-lg py-space-md bg-surface-container-low flex items-center justify-between shrink-0 shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-9 h-9 rounded bg-primary text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-body-lg">smart_toy</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<h1 class="font-headline-sm text-headline-sm text-on-surface font-bold truncate">Furika AI Cat Analyst</h1>
+<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Engine Online"></span>
+</div>
+<div class="flex items-center gap-1 text-label-sm font-label-sm text-on-surface-variant truncate">
+<span class="">Pipeline:</span>
+<span class="text-primary font-semibold">Hazard → Vuln → Exposure → Loss</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<button class="p-1 rounded text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors" onclick="resetChat()" title="Clear dialogue" type="button">
+<span class="material-symbols-outlined text-body-md">refresh</span>
+</button>
+<span class="px-2 py-0.5 rounded font-label-sm text-label-sm bg-surface-container-high text-on-surface font-mono">v4.8 Hydro</span>
+</div>
+</div>
+<!-- Dialogue Thread Scrollable Body -->
+<div class="flex-1 overflow-y-auto px-space-lg py-space-lg space-y-space-lg" id="chatMessagesScroll">
+<!-- Message 1 (User) -->
+<div class="flex flex-col items-end gap-1">
+<span class="font-label-sm text-label-sm text-outline">Dr. A. Omondi • 10:14 AM</span>
+<div class="max-w-[85%] bg-primary text-on-primary rounded p-space-md font-body-sm text-body-sm shadow-sm leading-relaxed">
+            Can you give me the portfolio flood loss summary across Nairobi scenarios and break down the risk assumptions?
+          </div>
+</div>
+<!-- Message 2 (Furika AI Analyst) -->
+<div class="flex flex-col items-start gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-primary font-bold">Furika Cat Modeling Engine</span>
+<span class="font-label-sm text-label-sm text-outline">• 10:14 AM</span>
+</div>
+<div class="w-full bg-surface-container-low text-on-surface rounded p-space-lg font-body-sm text-body-sm shadow-sm space-y-space-md">
+<!-- Plain-language synthesis -->
+<p class="leading-relaxed">
+              Across your <strong>142 synthetic property assets</strong> in Nairobi County with a combined Total Insured Exposure of <strong>KES 4,820,000,000</strong>, we modeled probabilistic flood event impacts using the standardized Cat framework:
+            </p>
+<div class="p-space-xs bg-surface-container-lowest rounded font-label-sm text-label-sm text-primary font-mono text-center">
+              [Hazard (Proxy 0–1)] ➔ [Vulnerability (JBA / World Bank MDR)] ➔ [Insured Value] ➔ [Financial Loss]
+            </div>
+<!-- Two Metric Summary Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm pt-space-xs">
+<div class="bg-surface-container-lowest p-space-md rounded shadow-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider block">Total Portfolio Exposure</span>
+<span class="font-metric-display text-metric-display text-primary block">KES 4.82B</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">5 Nairobi sub-counties (142 assets)</span>
+</div>
+<div class="bg-surface-container-lowest p-space-md rounded shadow-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider block">Probable Max Loss (PML 90%)</span>
+<span class="font-metric-display text-metric-display text-error block">KES 1.64B</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Extreme 1-in-100yr Equivalent</span>
+</div>
+</div>
+<!-- Modeled Loss Breakdown by Tier (Compact Data Table) -->
+<div class="space-y-1">
+<span class="font-label-md text-label-md text-on-surface font-semibold block">Modelled Event Loss by Severity Tier:</span>
+<div class="bg-surface-container-lowest rounded overflow-hidden">
+<div class="flex items-center justify-between px-space-md py-1 bg-surface-container-high font-label-sm text-label-sm text-outline uppercase tracking-wider">
+<span class="">Scenario Tier</span>
+<span class="">Portfolio Loss (KES)</span>
+<span class="">Mean Loss Ratio</span>
+</div>
+<div class="divide-y divide-surface-container">
+<div class="flex items-center justify-between px-space-md py-1 font-body-sm text-body-sm">
+<span class="text-primary font-medium">Common (&lt;0.2)</span>
+<span class="font-label-md text-label-md text-on-surface">KES 68.4M</span>
+<span class="font-label-sm text-label-sm text-outline">1.4%</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-1 font-body-sm text-body-sm">
+<span class="text-secondary font-medium">Occasional (0.2–0.4)</span>
+<span class="font-label-md text-label-md text-on-surface">KES 184.2M</span>
+<span class="font-label-sm text-label-sm text-outline">3.8%</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-1 font-body-sm text-body-sm">
+<span class="text-amber-700 font-medium">Moderate (0.4–0.6)</span>
+<span class="font-label-md text-label-md text-on-surface">KES 412.0M</span>
+<span class="font-label-sm text-label-sm text-outline">8.5%</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-1 font-body-sm text-body-sm">
+<span class="text-orange-700 font-medium">Severe (0.6–0.8)</span>
+<span class="font-label-md text-label-md text-error font-semibold">KES 895.5M</span>
+<span class="font-label-sm text-label-sm text-error">18.6%</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-1 font-body-sm text-body-sm bg-error-container/20">
+<span class="text-error font-bold">Extreme (0.8–1.0)</span>
+<span class="font-label-md text-label-md text-error font-bold">KES 1,642.0M</span>
+<span class="font-label-sm text-label-sm text-error font-bold">34.1%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- EMBEDDED LOSS EXCEEDANCE PROBABILITY (EP) CURVE -->
+<div class="bg-surface-container-lowest p-space-md rounded shadow-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Exceedance Probability (EP) vs. Loss (KES M)</span>
+<span class="font-label-sm text-label-sm text-primary font-mono">Monotonic Loss Curve</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                Financial losses strictly scale upward as annual exceedance frequency declines (rarity increases):
+              </p>
+<!-- Clean SVG EP Curve Chart -->
+<div class="w-full h-36 pt-1">
+<svg class="w-full h-full" viewBox="0 0 400 130">
+<!-- Gridlines -->
+<line stroke="#cbd5e1" stroke-dasharray="3,3" stroke-width="0.5" x1="40" x2="390" y1="10" y2="10"></line>
+<line stroke="#cbd5e1" stroke-dasharray="3,3" stroke-width="0.5" x1="40" x2="390" y1="40" y2="40"></line>
+<line stroke="#cbd5e1" stroke-dasharray="3,3" stroke-width="0.5" x1="40" x2="390" y1="70" y2="70"></line>
+<line stroke="#cbd5e1" stroke-width="1" x1="40" x2="390" y1="100" y2="100"></line>
+<line stroke="#cbd5e1" stroke-width="1" x1="40" x2="40" y1="10" y2="100"></line>
+<!-- Y-Axis Ticks (Loss in KES Millions) -->
+<text class="font-label-sm text-[8px] fill-on-surface-variant text-right" text-anchor="end" x="35" y="14">1,600M</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant text-right" text-anchor="end" x="35" y="44">900M</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant text-right" text-anchor="end" x="35" y="74">400M</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant text-right" text-anchor="end" x="35" y="102">0M</text>
+<!-- X-Axis Labels (Exceedance Probability) -->
+<text class="font-label-sm text-[8px] fill-on-surface-variant" text-anchor="middle" x="80" y="115">50% (2yr)</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant" text-anchor="middle" x="160" y="115">20% (5yr)</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant" text-anchor="middle" x="240" y="115">10% (10yr)</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant" text-anchor="middle" x="320" y="115">2% (50yr)</text>
+<text class="font-label-sm text-[8px] fill-on-surface-variant" text-anchor="middle" x="375" y="115">1% (100yr)</text>
+<!-- EP Curve Area Gradient Fill -->
+<defs>
+<linearGradient id="epGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#00647c" stop-opacity="0.35"></stop>
+<stop offset="100%" stop-color="#00647c" stop-opacity="0.0"></stop>
+</linearGradient>
+</defs>
+<path d="M 80 96 Q 160 88 240 70 T 320 38 T 375 14 L 375 100 L 80 100 Z" fill="url(#epGrad)"></path>
+<!-- EP Line Curve -->
+<path d="M 80 96 Q 160 88 240 70 T 320 38 T 375 14" fill="none" stroke="#00647c" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Data Markers -->
+<circle cx="80" cy="96" fill="#00647c" r="3"></circle>
+<circle cx="160" cy="88" fill="#00647c" r="3"></circle>
+<circle cx="240" cy="70" fill="#00647c" r="3"></circle>
+<circle cx="320" cy="38" fill="#c2410c" r="3.5"></circle>
+<circle cx="375" cy="14" fill="#ba1a1a" r="4"></circle>
+</svg>
+</div>
+</div>
+<!-- Housing Class Vulnerability Breakdown -->
+<div class="space-y-space-xs">
+<span class="font-label-sm text-label-sm uppercase font-semibold text-outline block">Vulnerability by Nairobi Structural Class (Severe Tier):</span>
+<div class="grid grid-cols-1 gap-1">
+<div class="flex items-center justify-between p-1.5 rounded bg-surface-container-lowest font-body-sm text-body-sm">
+<span class="text-on-surface font-medium truncate">Informal Settlements (Timber / Corrugated Sheet)</span>
+<span class="font-label-sm text-label-sm text-error font-bold shrink-0 ml-2">72% Mean Damage Ratio</span>
+</div>
+<div class="flex items-center justify-between p-1.5 rounded bg-surface-container-lowest font-body-sm text-body-sm">
+<span class="text-on-surface font-medium truncate">Unreinforced Masonry (Commercial / Flats)</span>
+<span class="font-label-sm text-label-sm text-orange-700 font-bold shrink-0 ml-2">41% Mean Damage Ratio</span>
+</div>
+<div class="flex items-center justify-between p-1.5 rounded bg-surface-container-lowest font-body-sm text-body-sm">
+<span class="text-on-surface font-medium truncate">Reinforced Concrete (Engineered High-Rise)</span>
+<span class="font-label-sm text-label-sm text-primary font-bold shrink-0 ml-2">14% Mean Damage Ratio</span>
+</div>
+</div>
+</div>
+<!-- Transparent Citations & Provenance Callout -->
+<div class="p-space-md rounded bg-surface-container-highest/60 text-body-sm space-y-1">
+<div class="flex items-center gap-1 font-label-md text-label-md text-on-surface font-bold">
+<span class="material-symbols-outlined text-body-md text-primary">menu_book</span>
+<span class="">Model Citations &amp; Assumptions</span>
+</div>
+<ul class="text-label-sm font-label-sm text-on-surface-variant space-y-0.5 list-disc pl-4">
+<li class=""><strong>Hazard:</strong> 30m DEM Topographic Wetness Index (TWI) &amp; HAND terrain proxy combined with KMD Nairobi decile rainfall.</li>
+<li class=""><strong>Vulnerability Curves:</strong> World Bank GFDRR &amp; JBA Risk 2021 Sub-Saharan urban depth-damage parameters (§4.2).</li>
+<li class=""><strong>Portfolio Base:</strong> <code class="font-mono text-primary">exposure_nairobi_with_hazard.csv</code> (Rev 2024.1).</li>
+<li class=""><strong>Known Limitation:</strong> Topographical proxy does not dynamically calculate localized debris accumulation in culverts along Enterprise &amp; Mombasa Rd.</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Message 3 (User) -->
+<div class="flex flex-col items-end gap-1">
+<span class="font-label-sm text-label-sm text-outline">Dr. A. Omondi • 10:18 AM</span>
+<div class="max-w-[85%] bg-primary text-on-primary rounded p-space-md font-body-sm text-body-sm shadow-sm leading-relaxed">
+            Add a new synthetic property in Mathare North: a light commercial warehouse valued at 35M KES and recalculate.
+          </div>
+</div>
+<!-- Message 4 (Furika AI Analyst with Interactive Actionable Card) -->
+<div class="flex flex-col items-start gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-primary font-bold">Furika Cat Modeling Engine</span>
+<span class="font-label-sm text-label-sm text-outline">• Just Now</span>
+</div>
+<div class="w-full bg-surface-container-low text-on-surface rounded p-space-lg font-body-sm text-body-sm shadow-sm space-y-space-md">
+<p class="">
+              I have synthesized a candidate asset in the Mathare North sub-basin and queried the Nairobi DEM hazard proxy at coordinate <code class="font-mono text-primary font-semibold">(-1.2589, 36.8612)</code>:
+            </p>
+<!-- Synthetic Property Preview Card -->
+<div class="bg-surface-container-lowest p-space-md rounded shadow-sm space-y-space-sm" id="candidateAssetCard">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-primary font-bold">SYN-NRB-143 (Pending Addition)</span>
+<span class="px-2 py-0.5 rounded font-label-sm text-label-sm bg-error-container text-on-error-container font-bold uppercase">Extreme Hazard (0.82)</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs font-body-sm text-body-sm">
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Location</span>
+<span class="font-semibold text-on-surface">Mathare North River Basin</span>
+</div>
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Construction Class</span>
+<span class="font-semibold text-on-surface">Steel Frame + Masonry Infill</span>
+</div>
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Replacement Value</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">KES 35,000,000</span>
+</div>
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Severe Damage Ratio</span>
+<span class="font-label-md text-label-md text-error font-bold">44.5% (Loss: KES 15.58M)</span>
+</div>
+</div>
+<!-- Interactive Confirmation Buttons -->
+<div class="flex items-center gap-space-sm pt-space-xs" id="confirmActionsRow">
+<button class="flex-1 h-8 bg-secondary hover:bg-secondary-fixed-dim text-on-secondary font-label-md text-label-md rounded flex items-center justify-center gap-1.5 transition-colors shadow-sm" id="btnConfirmAdd" onclick="confirmAddSyntheticAsset()" type="button">
+<span class="material-symbols-outlined text-body-md">add_location_alt</span>
+<span class="">Confirm &amp; Add to Portfolio</span>
+</button>
+<button class="h-8 px-space-md bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md rounded transition-colors" onclick="adjustParametersNotice()" type="button">
+                  Adjust Values
+                </button>
+</div>
+<!-- Success Alert (Hidden until confirmed) -->
+<div class="hidden p-space-sm rounded bg-emerald-50 text-emerald-900 font-label-sm text-label-sm flex items-center gap-2" id="confirmSuccessAlert">
+<span class="material-symbols-outlined text-emerald-600 text-body-md">check_circle</span>
+<span class="">Asset <strong>SYN-NRB-143</strong> added to GIS Canvas. Nairobi Portfolio recalculated to <strong>143 properties (KES 4.855B)</strong>.</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Because of its close elevation proximity to the Mathare Riverbed, this asset falls into the top 12% highest vulnerability deciles in the county.
+            </p>
+</div>
+</div>
+<!-- Dynamically Inserted Chat Messages will appear here -->
+<div class="space-y-space-md" id="dynamicChatContainer"></div>
+</div>
+<!-- Quick Prompt Suggestion Pills Bar -->
+<div class="px-space-lg pt-space-xs pb-space-xs bg-surface-container-low/60 flex items-center gap-space-xs overflow-x-auto shrink-0">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold shrink-0">Quick Queries:</span>
+<button class="whitespace-nowrap px-2 py-1 rounded bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm shadow-sm transition-colors" onclick="setQuickPrompt('Compare Kibera vs South C modeled risk')" type="button">
+          Compare Kibera vs South C
+        </button>
+<button class="whitespace-nowrap px-2 py-1 rounded bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm shadow-sm transition-colors" onclick="setQuickPrompt('Explain terrain proxy vs gauged depth')" type="button">
+          Terrain Proxy vs Depth
+        </button>
+<button class="whitespace-nowrap px-2 py-1 rounded bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm shadow-sm transition-colors" onclick="setQuickPrompt('Audit unreinforced masonry portfolio')" type="button">
+          Audit Masonry Portfolio
+        </button>
+</div>
+<!-- Chat Input Area -->
+<div class="p-space-lg bg-surface-container-lowest shrink-0 shadow-lg">
+<form class="flex flex-col gap-space-xs" onsubmit="handleSendChat(event)">
+<div class="relative flex items-center bg-surface-container-low rounded focus-within:bg-surface-container-lowest focus-within:ring-1 focus-within:ring-primary shadow-inner">
+<textarea class="w-full p-space-md bg-transparent text-on-surface font-body-sm text-body-sm resize-none focus:outline-none placeholder:text-outline" id="chatTextarea" onkeydown="if(event.key === 'Enter' &amp;&amp; !event.shiftKey) { event.preventDefault(); handleSendChat(event); }" placeholder="Ask Furika AI or describe a synthetic property (e.g. 'Add 20M residential flat in Kilimani')..." rows="2"></textarea>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-space-xs">
+<button class="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors" title="Attach CSV Asset Ledger" type="button">
+<span class="material-symbols-outlined text-body-md">upload_file</span>
+</button>
+<button class="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors" onclick="setQuickPrompt('Select asset from GIS map and evaluate damage')" title="Select Map Marker" type="button">
+<span class="material-symbols-outlined text-body-md">pin_drop</span>
+</button>
+<span class="font-label-sm text-label-sm text-outline hidden sm:inline">Shift+Enter for line break</span>
+</div>
+<button class="h-9 px-space-xl bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md rounded flex items-center gap-1.5 transition-colors shadow-sm" type="submit">
+<span class="">Analyze</span>
+<span class="material-symbols-outlined text-body-sm">send</span>
+</button>
+</div>
+</form>
+</div>
+</div><div class="w-full lg:w-[58%] xl:w-[60%] 2xl:w-[62%] h-full relative flex flex-col bg-surface-container-low overflow-hidden" id="gisMapPane">
+<!-- Map Top Controls Island -->
+<div class="absolute top-space-md left-space-md right-space-md z-20 flex flex-col gap-space-xs pointer-events-none">
+<!-- Search, Basemap & Quick Tools Bar -->
+<div class="flex items-center gap-space-sm pointer-events-auto">
+<!-- Search Bar -->
+<div class="flex-1 relative flex items-center bg-surface-container-lowest shadow-md rounded">
+<span class="material-symbols-outlined text-outline absolute left-3 text-body-lg">search</span>
+<input class="w-full h-9 pl-9 pr-8 bg-transparent text-on-surface font-body-sm text-body-sm focus:outline-none placeholder:text-outline" id="mapSearchInput" placeholder="Search Nairobi location (e.g. South C, Mathare Valley, Kibera, Industrial Area)..." type="text">
+<button class="absolute right-2 text-outline hover:text-on-surface" onclick="document.getElementById('mapSearchInput').value='';" type="button">
+<span class="material-symbols-outlined text-body-sm">close</span>
+</button>
+</div>
+<!-- Basemap Selector -->
+<div class="flex items-center bg-surface-container-lowest shadow-md rounded p-0.5 shrink-0">
+<button class="px-space-sm py-1 font-label-sm text-label-sm rounded bg-secondary text-on-secondary font-medium" id="bmVector" onclick="setBasemap('vector')" type="button">Vector</button>
+<button class="px-space-sm py-1 font-label-sm text-label-sm rounded text-on-surface-variant hover:text-on-surface" id="bmTopo" onclick="setBasemap('topo')" type="button">HAND / DEM</button>
+<button class="px-space-sm py-1 font-label-sm text-label-sm rounded text-on-surface-variant hover:text-on-surface" id="bmSat" onclick="setBasemap('satellite')" type="button">Satellite</button>
+</div>
+<!-- Zoom & Reset Island -->
+<div class="flex items-center bg-surface-container-lowest shadow-md rounded shrink-0">
+<button class="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors" onclick="zoomMap(1)" title="Zoom in" type="button">
+<span class="material-symbols-outlined text-body-md">add</span>
+</button>
+<div class="w-px h-5 bg-outline-variant"></div>
+<button class="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors" onclick="zoomMap(-1)" title="Zoom out" type="button">
+<span class="material-symbols-outlined text-body-md">remove</span>
+</button>
+</div>
+</div>
+<!-- Layer Checkboxes Bar -->
+<div class="flex items-center gap-space-xs flex-wrap bg-surface-container-lowest/90 backdrop-blur-md px-space-md py-1.5 shadow-sm rounded pointer-events-auto">
+<span class="font-label-sm text-label-sm text-outline font-semibold uppercase tracking-wider mr-1">Layers:</span>
+<label class="flex items-center gap-1.5 text-label-sm font-label-sm text-on-surface cursor-pointer select-none">
+<input checked="" class="rounded text-primary focus:ring-0" id="layerRivers" onchange="toggleLayer('rivers')" type="checkbox">
+<span class="">River Basins (Nairobi/Ngong)</span>
+</label>
+<span class="text-outline-variant">•</span>
+<label class="flex items-center gap-1.5 text-label-sm font-label-sm text-on-surface cursor-pointer select-none">
+<input checked="" class="rounded text-primary focus:ring-0" id="layerHotspots" onchange="toggleLayer('hotspots')" type="checkbox">
+<span class="">Historical Hotspots</span>
+</label>
+<span class="text-outline-variant">•</span>
+<label class="flex items-center gap-1.5 text-label-sm font-label-sm text-on-surface cursor-pointer select-none">
+<input checked="" class="rounded text-primary focus:ring-0" id="layerHazardHeat" onchange="toggleLayer('hazard')" type="checkbox">
+<span class="">Terrain Susceptibility Proxy</span>
+</label>
+<span class="text-outline-variant">•</span>
+<label class="flex items-center gap-1.5 text-label-sm font-label-sm text-on-surface cursor-pointer select-none">
+<input checked="" class="rounded text-primary focus:ring-0" id="layerProperties" onchange="toggleLayer('props')" type="checkbox">
+<span class="font-semibold text-primary">Portfolio (<span id="portfolioCountBadge" class="">142</span> Assets)</span>
+</label>
+</div>
+<!-- Risk Tier Selector Bar -->
+<div class="flex items-center gap-1 overflow-x-auto bg-surface-container-lowest px-space-sm py-1 shadow-sm rounded pointer-events-auto">
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm bg-primary text-on-primary font-semibold transition-all" id="btnTier-all" onclick="filterTier('all')" type="button">
+            All Tiers (142)
+          </button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-primary hover:bg-surface-container-high transition-all" id="btnTier-common" onclick="filterTier('common')" type="button">
+            Common (0.0-0.2) • 28
+          </button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-secondary hover:bg-surface-container-high transition-all" id="btnTier-occasional" onclick="filterTier('occasional')" type="button">
+            Occasional (0.2-0.4) • 34
+          </button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-amber-700 hover:bg-surface-container-high transition-all" id="btnTier-moderate" onclick="filterTier('moderate')" type="button">
+            Moderate (0.4-0.6) • 39
+          </button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-orange-700 hover:bg-surface-container-high transition-all" id="btnTier-severe" onclick="filterTier('severe')" type="button">
+            Severe (0.6-0.8) • 26
+          </button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-error hover:bg-surface-container-high transition-all" id="btnTier-extreme" onclick="filterTier('extreme')" type="button">
+            Extreme (0.8-1.0) • 15
+          </button>
+</div>
+</div>
+<!-- MAP VIEWPORT CANVAS BACKPLATE (Google Maps Static / Dynamic Styled Visual) -->
+<div class="w-full h-full relative select-none cursor-grab active:cursor-grabbing bg-surface-container" data-alt="Technical high-resolution GIS map of Nairobi Kenya showing topography contours, the winding Nairobi River and Ngong River waterways, road networks from South C to Upper Hill, and flood drainage catchment shading in clean cyan and slate." data-location="Nairobi, Kenya" id="gisInteractiveMap" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCWZdC-nsO8XRuamnkCXHjOtU-QNx4c9GF4Rt0ofHbHbBB5Cmy9Y1ZkumKOtAcrCiRslCMLpfZyRTZfCD7VA-G-ehUqDcqLi7aHKuuSF2qD-m-M6Fc0XuYvrnD5pZzJ_oxIi07z2e9lvh8phESBXXHP5QW5Ggzgu1yQlFrq7h4AQkApu3o5egyZhahKEoIRDwybuo7WeS-1meu7PgW_tNx4oT7ArQGxHre9liW2-DPe');">
+<!-- Topographical & Hydro Vector Overlay SVG -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" id="hydroVectorLayer" preserveAspectRatio="none" viewBox="0 0 1000 700">
+<!-- River Basins Polyline Paths -->
+<g class="transition-opacity duration-300" id="svgRivers">
+<!-- Mathare River -->
+<path d="M 50 140 Q 250 160 450 130 T 780 180 T 980 160" fill="none" opacity="0.85" stroke="#007f9d" stroke-linecap="round" stroke-width="4.5"></path>
+<text class="font-label-sm text-[10px] fill-primary-container font-bold tracking-widest" x="320" y="145">MATHARE RIVER</text>
+<!-- Nairobi River Main Channel -->
+<path d="M 30 260 Q 280 300 480 240 T 750 310 T 990 270" fill="none" opacity="0.9" stroke="#00647c" stroke-linecap="round" stroke-width="6"></path>
+<text class="font-label-sm text-[10px] fill-primary font-bold tracking-widest" x="510" y="255">NAIROBI RIVER MAIN STEM</text>
+<!-- Ngong River Basin & Canal -->
+<path d="M 80 470 Q 320 440 520 490 T 820 450 T 990 510" fill="none" opacity="0.85" stroke="#007f9d" stroke-linecap="round" stroke-width="5"></path>
+<text class="font-label-sm text-[10px] fill-secondary font-bold tracking-widest" x="540" y="505">NGONG RIVER DRAINAGE</text>
+<!-- Nairobi Dam Inflow -->
+<ellipse cx="380" cy="520" fill="#007f9d" fill-opacity="0.25" rx="42" ry="24" stroke="#00647c" stroke-width="2"></ellipse>
+<text class="font-label-sm text-[9px] fill-on-surface font-semibold" x="345" y="525">NAIROBI DAM</text>
+</g>
+<!-- Topographic Hazard Proxy Heat / Wetness Gradient Polygons (HAND/TWI Proxies) -->
+<g class="transition-opacity duration-300" id="svgHazardHeat">
+<!-- Mathare Lowland Basin Heat -->
+<path d="M 280 110 Q 420 80 520 120 T 480 170 T 310 160 Z" fill="#ba1a1a" fill-opacity="0.28"></path>
+<!-- Mukuru & Industrial Area Flash Sink -->
+<path d="M 520 380 Q 720 360 810 440 T 690 530 T 510 470 Z" fill="#ba1a1a" fill-opacity="0.32"></path>
+<!-- South C & Popo Rd Depressional Bowl -->
+<path d="M 390 410 Q 510 390 560 450 T 490 510 T 380 470 Z" fill="#c2410c" fill-opacity="0.30"></path>
+<!-- Kibera Valley Incline -->
+<path d="M 190 450 Q 340 430 370 510 T 260 560 T 180 500 Z" fill="#d97706" fill-opacity="0.28"></path>
+</g>
+<!-- Documented Hotspot Danger Boundary Zones -->
+<g class="transition-opacity duration-300" id="svgHotspots">
+<!-- Mathare 4A Boundary -->
+<rect fill="none" height="65" rx="6" stroke="#ba1a1a" stroke-dasharray="6,4" stroke-width="2" width="130" x="360" y="115"></rect>
+<!-- South C Popo Rd Zone -->
+<rect fill="none" height="75" rx="6" stroke="#c2410c" stroke-dasharray="6,4" stroke-width="2" width="130" x="420" y="420"></rect>
+<!-- Kibera Lindi/Makina -->
+<rect fill="none" height="70" rx="6" stroke="#d97706" stroke-dasharray="6,4" stroke-width="2" width="120" x="220" y="470"></rect>
+<!-- Mukuru kwa Njenga -->
+<rect fill="none" height="85" rx="6" stroke="#ba1a1a" stroke-dasharray="6,4" stroke-width="2" width="140" x="620" y="410"></rect>
+<!-- Gikomba Market -->
+<rect fill="none" height="50" rx="6" stroke="#ba1a1a" stroke-dasharray="6,4" stroke-width="2" width="90" x="520" y="270"></rect>
+</g>
+</svg>
+<!-- Hotspot Labels floating on map -->
+<div class="absolute inset-0 pointer-events-none" id="hotspotLabelsLayer">
+<div class="absolute left-[38%] top-[17%] px-2 py-0.5 bg-error-container text-on-error-container font-label-sm text-label-sm rounded shadow-sm">
+            HOTSPOT: Mathare 4A Basin
+          </div>
+<div class="absolute left-[44%] top-[62%] px-2 py-0.5 bg-orange-100 text-orange-900 font-label-sm text-label-sm rounded shadow-sm">
+            HOTSPOT: South C Shopping Ctr
+          </div>
+<div class="absolute left-[24%] top-[70%] px-2 py-0.5 bg-amber-100 text-amber-900 font-label-sm text-label-sm rounded shadow-sm">
+            HOTSPOT: Kibera Lindi / Makina
+          </div>
+<div class="absolute left-[64%] top-[61%] px-2 py-0.5 bg-error-container text-on-error-container font-label-sm text-label-sm rounded shadow-sm">
+            HOTSPOT: Mukuru kwa Njenga
+          </div>
+<div class="absolute left-[53%] top-[39%] px-2 py-0.5 bg-error-container text-on-error-container font-label-sm text-label-sm rounded shadow-sm">
+            HOTSPOT: Gikomba Fluvial Plain
+          </div>
+</div>
+<!-- Interactive Pins Container (Absolute Positioned Markers) -->
+<div class="absolute inset-0 pointer-events-auto" id="pinsContainer">
+<!-- Property Pin 1: South C (Default Highlighted) -->
+<button class="prop-pin absolute left-[46%] top-[64%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="severe" onclick="selectProperty('PROP-NRB-218')" title="PROP-NRB-218: South C" type="button">
+<span class="relative flex h-6 w-6 items-center justify-center">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-4 w-4 bg-orange-600 border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-6 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-218 (Severe)
+            </span>
+</button>
+<!-- Property Pin 2: Mathare North Commercial (Extreme) -->
+<button class="prop-pin absolute left-[41%] top-[20%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="extreme" onclick="selectProperty('PROP-NRB-044')" title="PROP-NRB-044: Mathare Light Industrial" type="button">
+<span class="relative flex h-5 w-5 items-center justify-center">
+<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-error border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-5 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-044 (Extreme)
+            </span>
+</button>
+<!-- Property Pin 3: Industrial Area Warehouse (Severe) -->
+<button class="prop-pin absolute left-[62%] top-[56%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="severe" onclick="selectProperty('PROP-NRB-104')" title="PROP-NRB-104: Industrial Area Enterprise Rd" type="button">
+<span class="relative flex h-5 w-5 items-center justify-center">
+<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-orange-600 border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-5 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-104 (Severe)
+            </span>
+</button>
+<!-- Property Pin 4: Kilimani Mixed-Use (Moderate) -->
+<button class="prop-pin absolute left-[32%] top-[48%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="moderate" onclick="selectProperty('PROP-NRB-073')" title="PROP-NRB-073: Kilimani Argwings Kodhek" type="button">
+<span class="relative flex h-5 w-5 items-center justify-center">
+<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-600 border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-5 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-073 (Moderate)
+            </span>
+</button>
+<!-- Property Pin 5: Upper Hill Financial Tower (Occasional) -->
+<button class="prop-pin absolute left-[43%] top-[45%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="occasional" onclick="selectProperty('PROP-NRB-082')" title="PROP-NRB-082: Upper Hill Commercial Plaza" type="button">
+<span class="relative flex h-5 w-5 items-center justify-center">
+<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-secondary border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-5 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-082 (Occasional)
+            </span>
+</button>
+<!-- Property Pin 6: Karen Residential Estate (Common) -->
+<button class="prop-pin absolute left-[15%] top-[78%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none" data-tier="common" onclick="selectProperty('PROP-NRB-019')" title="PROP-NRB-019: Karen Hardy Ridge" type="button">
+<span class="relative flex h-5 w-5 items-center justify-center">
+<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-primary border-2 border-white shadow-md group-hover:scale-125 transition-transform"></span>
+</span>
+<span class="absolute left-5 top-0 hidden group-hover:flex bg-surface-container-lowest text-on-surface font-label-sm text-label-sm px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              PROP-NRB-019 (Common)
+            </span>
+</button>
+<!-- Dynamic Newly Added Synthetic Pin Slot (Initially Hidden) -->
+<button class="prop-pin hidden absolute left-[44%] top-[16%] -translate-x-1/2 -translate-y-1/2 group focus:outline-none z-30" data-tier="extreme" id="newSyntheticPin" onclick="selectProperty('SYN-NRB-143')" title="SYN-NRB-143: Mathare North Commercial Warehouse" type="button">
+<span class="relative flex h-7 w-7 items-center justify-center">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-90"></span>
+<span class="relative inline-flex rounded-full h-5 w-5 bg-error text-white font-label-sm text-[9px] items-center justify-center font-bold border-2 border-white shadow-lg">143</span>
+</span>
+</button>
+</div>
+<!-- SELECTED LOCATION FLOATING INSPECTION CARD (Level 2 Elevation) -->
+<div class="absolute bottom-10 left- space-md left-4 sm:left-6 max-w-sm w-[90%] sm:w-[350px] bg-surface-container-lowest/95 backdrop-blur-md shadow-xl rounded p-space-md z-30 transition-all" id="inspectorCard">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-orange-600 shrink-0" id="cardStatusDot"></span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate font-bold" id="cardTitle">South C - Popo Rd</h2>
+</div>
+<span class="bg-orange-100 text-orange-800 font-label-sm text-label-sm px-1.5 py-0.5 rounded uppercase font-semibold" id="cardTierBadge">Severe 0.74</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant pb-space-sm" id="cardPropId">PROP-NRB-218 • High-Density Residential (Masonry Tier 2)</p>
+<!-- Value Matrix Grid -->
+<div class="grid grid-cols-2 gap-space-xs bg-surface-container-low p-space-xs rounded mb-space-sm text-body-sm">
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Replacement Value</span>
+<span class="font-label-md text-label-md text-on-surface font-bold" id="cardValue">KES 48,500,000</span>
+<span class="text-[10px] text-outline block">~$375,000 USD</span>
+</div>
+<div>
+<span class="text-outline font-label-sm text-label-sm block">Modelled Loss (Severe)</span>
+<span class="font-label-md text-label-md text-error font-bold" id="cardLoss">KES 18,527,000</span>
+<span class="text-[10px] text-error font-medium block" id="cardRatio">MDR: 38.2% (Damage × Value)</span>
+</div>
+</div>
+<!-- Hydrological Proximity Notes -->
+<div class="flex items-center gap-space-xs text-body-sm text-on-surface-variant pb-space-sm">
+<span class="material-symbols-outlined text-primary text-body-md shrink-0">water</span>
+<span class="font-body-sm text-body-sm truncate" id="cardProximity">120m to Ngong River canalized drainage</span>
+</div>
+<!-- Ask Copilot Direct Trigger Button -->
+<button class="w-full h-8 bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md rounded flex items-center justify-center gap-space-xs transition-colors shadow-sm" onclick="promptCopilotForSelectedAsset()" type="button">
+<span class="material-symbols-outlined text-body-md">smart_toy</span>
+<span class="">Ask AI Analyst about this asset 💬</span>
+</button>
+</div>
+<!-- Interactive Map Legend (Floating Bottom Right) -->
+<div class="absolute bottom-10 right-4 bg-surface-container-lowest/95 backdrop-blur-md p-space-sm rounded shadow-md text-body-sm max-w-xs z-20">
+<div class="font-label-sm text-label-sm uppercase font-semibold text-outline pb-1">Terrain Hazard Proxy (HAND/TWI)</div>
+<div class="h-2 w-full rounded bg-gradient-to-r from-cyan-400 via-amber-400 to-rose-600 mb-1"></div>
+<div class="flex justify-between font-label-sm text-[10px] text-on-surface-variant mb-2">
+<span class="">0.0 (Low Hill)</span>
+<span class="">0.5</span>
+<span class="">1.0 (Valley Plain)</span>
+</div>
+<div class="grid grid-cols-2 gap-x-2 gap-y-1 text-label-sm font-label-sm text-on-surface">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-primary shrink-0"></span>
+<span class="">Common (&lt;0.2)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary shrink-0"></span>
+<span class="">Occasional (0.2-0.4)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+<span class="">Moderate (0.4-0.6)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-orange-600 shrink-0"></span>
+<span class="">Severe (0.6-0.8)</span>
+</div>
+<div class="flex items-center gap-1.5 col-span-2">
+<span class="w-2.5 h-2.5 rounded-full bg-error shrink-0"></span>
+<span class="">Extreme (0.8-1.0 River Inundation)</span>
+</div>
+</div>
+</div>
+<!-- Bottom Telemetry Coordinates Strip -->
+<div class="absolute bottom-0 left-0 right-0 h-6 bg-surface-container-lowest/95 px-space-md flex items-center justify-between font-label-sm text-label-sm text-outline z-20">
+<div class="flex items-center gap-space-md truncate">
+<span class="">LAT: -1.2921° S | LON: 36.8219° E</span>
+<span class="hidden sm:inline">DEM: 1,678m ASL</span>
+<span class="hidden md:inline">CATCHMENT: Nairobi-Athí Sub-basin #4B</span>
+</div>
+<div class="font-medium text-primary">
+            JBA / KMD Basins Operational
+          </div>
+</div>
+</div>
+</div>
+<!-- RIGHT PANEL: AI CHATBOT & LOSS MODELING ANALYST (approx 40%) -->
+
+</div>
+</div>
+<script>
+  // Asset database simulating exposure_nairobi_with_hazard.csv
+  const ASSETS_DATA = {
+    'PROP-NRB-218': {
+      id: 'PROP-NRB-218',
+      name: 'South C - Popo Rd Basin',
+      category: 'High-Density Residential (Masonry Tier 2)',
+      valueStr: 'KES 48,500,000',
+      lossStr: 'KES 18,527,000',
+      ratioStr: 'MDR: 38.2% (Damage × Value)',
+      tier: 'severe',
+      tierLabel: 'Severe 0.74',
+      tierBadgeClass: 'bg-orange-100 text-orange-800',
+      dotColorClass: 'bg-orange-600',
+      proximity: '120m to Ngong River canalized drainage'
+    },
+    'PROP-NRB-044': {
+      id: 'PROP-NRB-044',
+      name: 'Mathare Valley Light Commercial',
+      category: 'Commercial Workshop (Timber/Sheet + Masonry)',
+      valueStr: 'KES 19,200,000',
+      lossStr: 'KES 11,904,000',
+      ratioStr: 'MDR: 62.0% (Damage × Value)',
+      tier: 'extreme',
+      tierLabel: 'Extreme 0.88',
+      tierBadgeClass: 'bg-error-container text-on-error-container',
+      dotColorClass: 'bg-error',
+      proximity: '45m to Mathare River low bank'
+    },
+    'PROP-NRB-104': {
+      id: 'PROP-NRB-104',
+      name: 'Industrial Area Enterprise Rd',
+      category: 'Heavy Logistics Warehouse (Steel Portal Frame)',
+      valueStr: 'KES 112,000,000',
+      lossStr: 'KES 31,360,000',
+      ratioStr: 'MDR: 28.0% (Damage × Value)',
+      tier: 'severe',
+      tierLabel: 'Severe 0.68',
+      tierBadgeClass: 'bg-orange-100 text-orange-800',
+      dotColorClass: 'bg-orange-600',
+      proximity: '280m to Ngong Canal Outfall'
+    },
+    'PROP-NRB-073': {
+      id: 'PROP-NRB-073',
+      name: 'Kilimani Argwings Plaza',
+      category: 'Mixed-Use Retail & Office (Reinforced Concrete)',
+      valueStr: 'KES 84,000,000',
+      lossStr: 'KES 11,760,000',
+      ratioStr: 'MDR: 14.0% (Damage × Value)',
+      tier: 'moderate',
+      tierLabel: 'Moderate 0.46',
+      tierBadgeClass: 'bg-amber-100 text-amber-800',
+      dotColorClass: 'bg-amber-600',
+      proximity: '740m to Kirichwa Kubwa tributary'
+    },
+    'PROP-NRB-082': {
+      id: 'PROP-NRB-082',
+      name: 'Upper Hill Commercial Plaza',
+      category: 'Corporate High-Rise (Reinforced Concrete Spec A)',
+      valueStr: 'KES 210,000,000',
+      lossStr: 'KES 8,400,000',
+      ratioStr: 'MDR: 4.0% (Damage × Value)',
+      tier: 'occasional',
+      tierLabel: 'Occasional 0.28',
+      tierBadgeClass: 'bg-cyan-100 text-cyan-800',
+      dotColorClass: 'bg-secondary',
+      proximity: '1.4km uphill from Nairobi Dam ridge'
+    },
+    'PROP-NRB-019': {
+      id: 'PROP-NRB-019',
+      name: 'Karen Hardy Residential Estate',
+      category: 'Single-Family Villa (Stone Masonry)',
+      valueStr: 'KES 65,000,000',
+      lossStr: 'KES 1,300,000',
+      ratioStr: 'MDR: 2.0% (Damage × Value)',
+      tier: 'common',
+      tierLabel: 'Common 0.12',
+      tierBadgeClass: 'bg-sky-100 text-sky-800',
+      dotColorClass: 'bg-primary',
+      proximity: '2.8km from primary floodplain'
+    },
+    'SYN-NRB-143': {
+      id: 'SYN-NRB-143',
+      name: 'Mathare North Commercial Warehouse',
+      category: 'Steel Frame with Masonry Infill (Commercial Tier 3)',
+      valueStr: 'KES 35,000,000',
+      lossStr: 'KES 15,575,000',
+      ratioStr: 'MDR: 44.5% (Damage × Value)',
+      tier: 'extreme',
+      tierLabel: 'Extreme 0.82',
+      tierBadgeClass: 'bg-error-container text-on-error-container',
+      dotColorClass: 'bg-error',
+      proximity: '65m to Mathare River active channel'
+    }
+  };
+
+  let activeSelectedAssetId = 'PROP-NRB-218';
+
+  // Function to inspect property on map click
+  function selectProperty(propId) {
+    const data = ASSETS_DATA[propId];
+    if (!data) return;
+
+    activeSelectedAssetId = propId;
+
+    document.getElementById('cardTitle').innerText = data.name;
+    document.getElementById('cardPropId').innerText = data.id + ' • ' + data.category;
+    document.getElementById('cardValue').innerText = data.valueStr;
+    document.getElementById('cardLoss').innerText = data.lossStr;
+    document.getElementById('cardRatio').innerText = data.ratioStr;
+    document.getElementById('cardProximity').innerText = data.proximity;
+    
+    const badge = document.getElementById('cardTierBadge');
+    badge.innerText = data.tierLabel;
+    badge.className = 'font-label-sm text-label-sm px-1.5 py-0.5 rounded uppercase font-semibold ' + data.tierBadgeClass;
+
+    const dot = document.getElementById('cardStatusDot');
+    dot.className = 'w-2.5 h-2.5 rounded-full shrink-0 ' + data.dotColorClass;
+  }
+
+  // Filter Pins by Risk Tier
+  function filterTier(tier) {
+    const pins = document.querySelectorAll('.prop-pin');
+    const buttons = ['all', 'common', 'occasional', 'moderate', 'severe', 'extreme'];
+
+    // Update buttons UI
+    buttons.forEach(b => {
+      const el = document.getElementById('btnTier-' + b);
+      if (b === tier) {
+        el.className = 'px-2 py-0.5 rounded font-label-sm text-label-sm bg-primary text-on-primary font-semibold transition-all';
+      } else {
+        el.className = 'px-2 py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high transition-all';
+      }
+    });
+
+    // Toggle Pins
+    pins.forEach(pin => {
+      if (tier === 'all' || pin.getAttribute('data-tier') === tier) {
+        pin.style.display = 'block';
+      } else {
+        pin.style.display = 'none';
+      }
+    });
+  }
+
+  // Layer toggling
+  function toggleLayer(layerName) {
+    if (layerName === 'rivers') {
+      const g = document.getElementById('svgRivers');
+      g.style.opacity = document.getElementById('layerRivers').checked ? '1' : '0';
+    } else if (layerName === 'hotspots') {
+      const g = document.getElementById('svgHotspots');
+      const labels = document.getElementById('hotspotLabelsLayer');
+      const val = document.getElementById('layerHotspots').checked ? '1' : '0';
+      g.style.opacity = val;
+      labels.style.opacity = val;
+    } else if (layerName === 'hazard') {
+      const g = document.getElementById('svgHazardHeat');
+      g.style.opacity = document.getElementById('layerHazardHeat').checked ? '1' : '0';
+    } else if (layerName === 'props') {
+      const pins = document.getElementById('pinsContainer');
+      pins.style.opacity = document.getElementById('layerProperties').checked ? '1' : '0';
+    }
+  }
+
+  // Basemap Switcher
+  function setBasemap(type) {
+    const btns = ['bmVector', 'bmTopo', 'bmSat'];
+    btns.forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'px-space-sm py-1 font-label-sm text-label-sm rounded text-on-surface-variant hover:text-on-surface';
+    });
+
+    if (type === 'vector') {
+      document.getElementById('bmVector').className = 'px-space-sm py-1 font-label-sm text-label-sm rounded bg-secondary text-on-secondary font-medium';
+    } else if (type === 'topo') {
+      document.getElementById('bmTopo').className = 'px-space-sm py-1 font-label-sm text-label-sm rounded bg-secondary text-on-secondary font-medium';
+    } else if (type === 'satellite') {
+      document.getElementById('bmSat').className = 'px-space-sm py-1 font-label-sm text-label-sm rounded bg-secondary text-on-secondary font-medium';
+    }
+  }
+
+  // Zoom control interaction
+  let currentZoom = 1;
+  function zoomMap(delta) {
+    currentZoom = Math.max(0.8, Math.min(1.4, currentZoom + delta * 0.1));
+    const hydro = document.getElementById('hydroVectorLayer');
+    if (hydro) {
+      hydro.style.transform = `scale(${currentZoom})`;
+      hydro.style.transformOrigin = 'center center';
+      hydro.style.transition = 'transform 0.2s ease-out';
+    }
+  }
+
+  // Populate copilot prompt from map inspector
+  function promptCopilotForSelectedAsset() {
+    const data = ASSETS_DATA[activeSelectedAssetId] || ASSETS_DATA['PROP-NRB-218'];
+    const textarea = document.getElementById('chatTextarea');
+    textarea.value = `Provide a full catastrophe risk audit for ${data.id} (${data.name}). How does its proximity to ${data.proximity} affect the modeled loss of ${data.lossStr}?`;
+    textarea.focus();
+  }
+
+  function setQuickPrompt(text) {
+    const textarea = document.getElementById('chatTextarea');
+    textarea.value = text;
+    textarea.focus();
+  }
+
+  function adjustParametersNotice() {
+    const textarea = document.getElementById('chatTextarea');
+    textarea.value = 'Change SYN-NRB-143 replacement value to 42M KES and raise elevation pad by 1.2m.';
+    textarea.focus();
+  }
+
+  // Confirm and Add Candidate Synthetic Asset
+  function confirmAddSyntheticAsset() {
+    // Show new pin on map
+    const newPin = document.getElementById('newSyntheticPin');
+    newPin.classList.remove('hidden');
+
+    // Update Portfolio badge
+    const badge = document.getElementById('portfolioCountBadge');
+    badge.innerText = '143';
+
+    // Show alert in card
+    document.getElementById('confirmActionsRow').classList.add('hidden');
+    document.getElementById('confirmSuccessAlert').classList.remove('hidden');
+
+    // Select the new asset immediately in inspector
+    selectProperty('SYN-NRB-143');
+
+    // Scroll chat to view
+    const scrollContainer = document.getElementById('chatMessagesScroll');
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }
+
+  // Chat Submission Handler
+  function handleSendChat(e) {
+    e.preventDefault();
+    const textarea = document.getElementById('chatTextarea');
+    const query = textarea.value.trim();
+    if (!query) return;
+
+    const dynamicContainer = document.getElementById('dynamicChatContainer');
+
+    // User Message DOM
+    const userMsg = document.createElement('div');
+    userMsg.className = 'flex flex-col items-end gap-1';
+    userMsg.innerHTML = `
+      <span class="font-label-sm text-label-sm text-outline">Dr. A. Omondi • Just Now</span>
+      <div class="max-w-[85%] bg-primary text-on-primary rounded p-space-md font-body-sm text-body-sm shadow-sm leading-relaxed">
+        ${escapeHtml(query)}
+      </div>
+    `;
+    dynamicContainer.appendChild(userMsg);
+
+    // AI Response DOM
+    const aiMsg = document.createElement('div');
+    aiMsg.className = 'flex flex-col items-start gap-1 pt-space-xs';
+    aiMsg.innerHTML = `
+      <div class="flex items-center gap-space-xs">
+        <span class="font-label-sm text-label-sm text-primary font-bold">Furika Cat Modeling Engine</span>
+        <span class="font-label-sm text-label-sm text-outline">• Just Now</span>
+      </div>
+      <div class="w-full bg-surface-container-low text-on-surface rounded p-space-lg font-body-sm text-body-sm shadow-sm space-y-space-sm">
+        <p class="leading-relaxed">
+          Evaluating <strong>"${escapeHtml(query)}"</strong> against Nairobi's 30m DEM TWI & HAND hydro surfaces:
+        </p>
+        <div class="bg-surface-container-lowest p-space-md rounded font-label-sm text-label-sm space-y-1">
+          <div class="flex justify-between text-on-surface">
+            <span>Model Execution:</span>
+            <span class="font-mono text-primary font-bold">Nairobi-SubBasin-Hydrology v4.8</span>
+          </div>
+          <div class="flex justify-between text-on-surface">
+            <span>Parametric Correlation:</span>
+            <span class="font-mono text-secondary">JBA Stage-Damage Class 3B</span>
+          </div>
+        </div>
+        <p class="text-on-surface-variant font-body-sm text-body-sm">
+          Comparative analysis confirms that low-lying catchments in <strong>Kibera (Ngong River headwaters)</strong> exhibit higher peak velocity shear, whereas <strong>South C</strong> acts as a static backwater depressional sink due to stormwater drainage throttling at the Mombasa Road culverts.
+        </p>
+      </div>
+    `;
+    dynamicContainer.appendChild(aiMsg);
+
+    textarea.value = '';
+    
+    // Auto-scroll chat
+    const scrollContainer = document.getElementById('chatMessagesScroll');
+    setTimeout(() => {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }, 50);
+  }
+
+  function resetChat() {
+    const dynamicContainer = document.getElementById('dynamicChatContainer');
+    dynamicContainer.innerHTML = '';
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>'"]/g, 
+      tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag] || tag)
+    );
+  }
+
+  // Mobile view switcher
+  function switchView(view) {
+    const mapPane = document.getElementById('gisMapPane');
+    const chatPane = document.getElementById('catCopilotPane');
+    const tabMap = document.getElementById('tabMapBtn');
+    const tabChat = document.getElementById('tabChatBtn');
+
+    if (view === 'map') {
+      mapPane.classList.remove('hidden');
+      chatPane.classList.add('hidden');
+      tabMap.className = 'flex-1 py-space-xs text-center font-label-md text-label-md rounded bg-primary text-on-primary';
+      tabChat.className = 'flex-1 py-space-xs text-center font-label-md text-label-md rounded text-on-surface hover:bg-surface-container-low';
+    } else {
+      mapPane.classList.add('hidden');
+      chatPane.classList.remove('hidden');
+      tabChat.className = 'flex-1 py-space-xs text-center font-label-md text-label-md rounded bg-primary text-on-primary';
+      tabMap.className = 'flex-1 py-space-xs text-center font-label-md text-label-md rounded text-on-surface hover:bg-surface-container-low';
+    }
+  }
+</script></main></div>
+
+</body></html>
