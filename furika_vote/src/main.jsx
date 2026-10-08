@@ -74,6 +74,7 @@ import AccumulationScreen from './AccumulationScreen.jsx';
 import { API_BASE_URL as BACKEND_URL, PORTFOLIO_ID, apiGet, apiRequest, describeError, log } from './api.js';
 import FormattedText from './FormattedText.jsx';
 import OfferChecks from './OfferChecks.jsx';
+import { carriedOfferContext, offerContextAfterResponse } from './chatOfferContext.js';
 import StageDrawer from './StageMetrics.jsx';
 
 // Scenario tiers on the map: common (rarest flood, widest footprint) in blue through to severe in red.
@@ -278,6 +279,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
   const [preview, setPreview] = useState(null);
   const [contextOpen, setContextOpen] = useState(false);
   const [attachedSourceIds, setAttachedSourceIds] = useState([]);
+  const [activeOffer, setActiveOffer] = useState(null);
   const [uploadError, setUploadError] = useState('');
   const thread = useRef(null);
   const contextFileInput = useRef(null);
@@ -290,13 +292,13 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
   useEffect(() => {
     const firstQuestion = messages.find((message) => message.role === 'user');
     if (!firstQuestion) return;
-    const entry = { id: activeChatId, title: firstQuestion.content.slice(0, 52), updatedAt: Date.now(), messages };
+    const entry = { id: activeChatId, title: firstQuestion.content.slice(0, 52), updatedAt: Date.now(), messages, offerContext: activeOffer };
     setRecentChats((current) => {
       const next = [entry, ...current.filter((chat) => chat.id !== activeChatId)].slice(0, 12);
       localStorage.setItem('furika-recent-chats', JSON.stringify(next));
       return next;
     });
-  }, [messages, activeChatId]);
+  }, [messages, activeChatId, activeOffer]);
 
   useEffect(() => {
     if (!reportReady) {
@@ -326,7 +328,8 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     const text = value.trim();
     if (!text || busy || dataSources.some((source) => attachedSourceIds.includes(source.id) && source.processing)) return;
     const selectedSources = dataSources.filter((source) => attachedSourceIds.includes(source.id));
-    const context = { portfolioId: PORTFOLIO_ID, uploadIds: selectedSources.map((source) => source.id) };
+    const context = { portfolioId: PORTFOLIO_ID, uploadIds: selectedSources.map((source) => source.id), ...carriedOfferContext(activeOffer, messages, selectedSources) };
+    const messageIndex = messages.length;
     if (location?.kind === 'hotspot') context.hotspotId = location.id;
     else if (location?.id) context.propertyId = location.id;
     setInput('');
@@ -348,6 +351,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     try {
       const data = await apiRequest('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis', context }) });
       await completeThinking();
+      setActiveOffer(offerContextAfterResponse(data, text, selectedSources, messageIndex, activeOffer));
       setMessages((current) => [...current, { role: 'assistant', content: data.answer, question: text, reportAttachments: selectedSources.map((source) => source.name), createdAt: new Date().toISOString(), source: data.source || 'Furika model context', citations: data.citations || [], workflow: data.workflow || null, offerChecks: data.offerChecks || null, provider: data.provider, model: data.model, actions: true }]);
       if (data.workflow?.status === 'review') onWorkflowPending(data.workflow);
       if (data.asset?.kind === 'offer' && data.asset.lat != null) onOfferLocation?.(data.asset);
@@ -366,6 +370,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
   const startNewChat = () => {
     setActiveChatId(`chat-${Date.now()}`);
     setMessages([INITIAL_CHAT_MESSAGE]);
+    setActiveOffer(null);
     setPreview(null);
     setHistoryOpen(false);
   };
@@ -373,6 +378,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
   const openRecentChat = (chat) => {
     setActiveChatId(chat.id);
     setMessages(chat.messages?.length ? chat.messages : [INITIAL_CHAT_MESSAGE]);
+    setActiveOffer(chat.offerContext || null);
     setPreview(null);
     setHistoryOpen(false);
   };
@@ -402,7 +408,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     <header className="panel-header"><div className="panel-title"><div className="bot-avatar"><FurikaMascot size={34} animated/></div><span><strong>Furika Bot <i /></strong><small>Your flood-risk analyst · Hazard → Vulnerability → Exposure → Loss</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Recent chats" onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/><span>Recent</span></button><button title="New conversation" onClick={startNewChat}><Plus size={16}/></button></div></header>
     {historyOpen && <aside className="recent-chats"><div className="recent-chats-head"><div><History size={15}/><strong>Recent chats</strong></div><button onClick={()=>setHistoryOpen(false)}><X size={15}/></button></div><button className="new-chat-button" onClick={startNewChat}><Plus size={14}/> New analysis</button><div className="recent-chat-list">{recentChats.length?recentChats.map((chat)=><button key={chat.id} className={chat.id===activeChatId?'active':''} onClick={()=>openRecentChat(chat)}><MessageSquareText size={14}/><span><strong>{chat.title}</strong><small>{new Date(chat.updatedAt).toLocaleDateString('en-KE',{month:'short',day:'numeric'})} · {new Date(chat.updatedAt).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</small></span><i onClick={(event)=>removeRecentChat(event,chat.id)} title="Delete chat"><Trash2 size={13}/></i></button>):<div className="no-recent-chats"><MessageSquareText size={20}/><strong>No recent chats</strong><span>Your completed conversations will appear here.</span></div>}</div></aside>}
     <div className="chat-thread" ref={thread}>
-      <div className="analyst-banner"><Sparkles size={15} /><div><strong>{portfolioSummary?.status === 'approved' ? 'Approved portfolio results available' : 'Dataset-grounded analyst'}</strong><span>Select a data source to ask about its uploaded contents.</span></div></div>
+      <div className="analyst-banner"><Sparkles size={15} /><div><strong>{activeOffer ? 'Single-offer review active' : portfolioSummary?.status === 'approved' ? 'Approved portfolio results available' : 'Dataset-grounded analyst'}</strong><span>{activeOffer ? 'Follow-up questions use this offer only; choose another source or clear it to switch.' : 'Select a data source to ask about its uploaded contents.'}</span></div></div>
       {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
         <div className="message-meta">{message.role === 'assistant' ? <span className="bot-meta"><FurikaMascot size={16}/> FURIKA BOT</span> : 'DR. A. OMONDI'} <span>· just now</span></div>
         <div className="message-bubble">{message.role === 'assistant' ? <FormattedText text={message.content}/> : <p>{message.content}</p>}{message.offerChecks && <OfferChecks report={message.offerChecks}/>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.source && <small className="message-source"><FileText size={11} /> {message.source}{message.citations?.length > 0 && ` · ${[...new Set(message.citations.map(citationLabel))].filter((label) => label !== message.source).slice(0, 4).join(', ')}`}</small>}{message.actions && <ResponseActions message={{ ...message, question: message.question || (message.summary ? null : messages.slice(0, index).reverse().find((item) => item.role === 'user')?.content), reportAttachments: message.reportAttachments || messages[index - 1]?.attachments }} reportReady={reportReady} onOpenView={onOpenView} workflow={message.workflow} onReviewRun={onWorkflowPending} offerChecks={message.offerChecks}/>}</div>
@@ -413,6 +419,7 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     </div>
     <div className="quick-prompts"><span>QUICK QUERIES</span>{['Explain the EP curve','Compare Kibera and Mathare','Show model limitations'].map((q) => <button key={q} onClick={() => submit(q)}>{q}</button>)}</div>
     <div className="chat-composer">
+      {activeOffer && <div className="chat-offer-context"><ShieldCheck size={14}/><span>Reviewing one offer: <strong>{activeOffer.kind === 'upload' ? activeOffer.name : 'pasted placement offer'}</strong></span><button type="button" onClick={() => setActiveOffer(null)}><X size={12}/> Clear</button></div>}
       {attachedSourceIds.length > 0 && <div className="attached-sources">{dataSources.filter((source) => attachedSourceIds.includes(source.id)).map((source) => <span key={source.id}>{sourceIcon(source.extension, 12)}<strong>{source.name}</strong><button title={`Remove ${source.name}`} onClick={() => toggleAttachedSource(source.id)}><X size={11}/></button></span>)}</div>}
       <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="Ask about an uploaded dataset, portfolio property, or workflow result…" />
       <div className="composer-actions"><button className={contextOpen ? 'context-trigger active' : 'context-trigger'} onClick={() => setContextOpen(!contextOpen)}><Plus size={14}/> Add context</button><small>{selectedSourceProcessing ? 'Waiting for file processing…' : 'Shift+Enter for new line'}</small><button className="analyse-button" onClick={() => submit()} disabled={!input.trim() || busy || selectedSourceProcessing}>Analyse <Send size={14}/></button></div>
