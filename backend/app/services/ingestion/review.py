@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from sqlalchemy import and_, or_
 
 from ...extensions import db
-from ...models import FieldProvenance, Property, Upload, UploadRow, ValidationIssue, new_id
+from ...models import DocumentChunk, DocumentFact, FieldProvenance, HazardReferencePoint, Property, Upload, UploadRow, ValidationIssue, new_id
 from .pipeline import evaluate_and_record, is_confirmed, promote, row_context
 from .validation import CANONICAL_FIELDS, CONFIRMABLE_CODES, PROMOTABLE_STATUSES
 
@@ -171,3 +171,54 @@ def _edit(row: UploadRow, upload: Upload, fields: dict, now: datetime) -> None:
         promote(upload, row, data, True, existing.get(data["loc_id"]))
     elif live is not None:
         _revert_property(live, row)
+
+
+def clear_derived(upload: Upload) -> None:
+    """Remove everything derived from an upload (rows, issues, provenance, chunks, facts); properties it last wrote are reverted or removed."""
+    rows = UploadRow.query.filter_by(upload_id=upload.id).all()
+    for row in rows:
+        prop = _live_property(row)
+        if prop is not None:
+            _revert_property(prop, row)
+    db.session.flush()
+    for row in rows:
+        row.property_id = None
+    Property.query.filter_by(upload_id=upload.id).update({"upload_id": None})
+    HazardReferencePoint.query.filter_by(source_upload_id=upload.id).update({"source_upload_id": None})
+    row_ids = [row.id for row in rows]
+    if row_ids:
+        FieldProvenance.query.filter(FieldProvenance.subject_type == "upload_row", FieldProvenance.subject_id.in_(row_ids)).delete(synchronize_session=False)
+    FieldProvenance.query.filter_by(source_upload_id=upload.id).delete(synchronize_session=False)
+    ValidationIssue.query.filter_by(upload_id=upload.id).delete(synchronize_session=False)
+    DocumentChunk.query.filter_by(upload_id=upload.id).delete(synchronize_session=False)
+    DocumentFact.query.filter_by(upload_id=upload.id).delete(synchronize_session=False)
+    UploadRow.query.filter_by(upload_id=upload.id).delete(synchronize_session=False)
+
+
+def delete_upload(upload_id: str, storage_root) -> None:
+    """Remove an upload and everything derived from it, then delete the stored original."""
+    upload = db.session.get(Upload, upload_id)
+    if upload is None:
+        raise ReviewError(f"Upload {upload_id} was not found.", 404)
+    clear_derived(upload)
+    path = storage_root / upload.storage_path
+    db.session.delete(upload)
+    db.session.commit()
+    if path.is_file():
+        path.chmod(0o600)
+        path.unlink()
+        try:
+            path.parent.rmdir()
+        except OSError:
+            pass
+
+
+def reset_for_reprocess(upload_id: str) -> Upload:
+    """Clear derived records so the stored original can be parsed again (e.g. after adding the Claude key)."""
+    upload = db.session.get(Upload, upload_id)
+    if upload is None:
+        raise ReviewError(f"Upload {upload_id} was not found.", 404)
+    clear_derived(upload)
+    upload.summary, upload.error, upload.status = {}, None, "received"
+    db.session.commit()
+    return upload

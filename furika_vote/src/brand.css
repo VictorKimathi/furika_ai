@@ -1,0 +1,30 @@
+/* Kenya Re brand layer: navy #041D3B (primary) and red #D11242 (accent).
+   Loaded last so it can set the brand tokens and the few accent rules. Risk colours (severe, high, …) stay semantic. */
+:root{--brand-navy:#041d3b;--brand-navy-dark:#021329;--brand-red:#d11242;--brand-red-dark:#a90e35;--primary:var(--brand-navy);--primary-dark:var(--brand-navy-dark)}
+
+/* Logo */
+.brand-logo{height:40px;width:auto;flex:0 0 auto;display:block;border-radius:3px}
+.brand.compact .brand-logo{height:32px}
+.brand strong{color:var(--brand-navy)}
+.login-logo{display:block;height:64px;width:auto;margin:0 auto 14px;border-radius:4px;box-shadow:0 6px 16px rgba(4,29,59,.18)}
+@media(max-width:760px){.brand-logo{height:32px}}
+
+/* Red accent: a thin brand rule under the top bars, kickers and active navigation */
+.app-header,.login-header{box-shadow:inset 0 -2px 0 var(--brand-red)}
+.section-kicker,.login-copy>span,.property-drawer>header>div:first-child>span{color:var(--brand-red)}
+
+/* Sidebar: a floating navy panel with rounded corners; icon above its label */
+@media(min-width:761px){
+  .tool-rail,.tool-rail.expanded{position:fixed;top:10px;bottom:10px;left:10px;width:88px;height:auto;padding:10px 8px;display:flex;flex-direction:column;background:var(--brand-navy);border:0;border-radius:16px;box-shadow:0 8px 24px rgba(4,29,59,.22);overflow:hidden auto}
+  .tool-rail .rail-toggle{display:none}
+  .rail-items{flex:1;justify-content:flex-start;gap:6px;padding-top:0}
+  .rail-items button:nth-last-child(2){margin-top:auto}
+  .tool-rail button{position:relative;width:100%;height:auto;min-height:66px;padding:10px 4px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:12px;color:rgba(255,255,255,.72);background:transparent;white-space:normal;text-align:center;transition:background-color .15s ease,color .15s ease}
+  .tool-rail button>svg{width:22px;height:22px}
+  .tool-rail button strong,.tool-rail.expanded button strong{display:block;color:inherit;font-size:10.5px!important;font-weight:600;line-height:1.2}
+  .tool-rail button:hover{color:#fff;background:rgba(255,255,255,.14)}
+  .tool-rail button.active{color:#fff;background:var(--brand-red);box-shadow:0 4px 12px rgba(209,18,66,.35)}
+  .workspace>.app-header,.workspace>.app-body,.workspace.nav-expanded>.app-header,.workspace.nav-expanded>.app-body{margin-left:108px}
+}
+.tool-rail button:focus-visible{outline:2px solid var(--brand-red);outline-offset:-2px}
+.login-submit:focus-visible,.data-sources-header>button:focus-visible{outline:2px solid var(--brand-red);outline-offset:2px}

@@ -5,7 +5,7 @@ import pytest
 from app import create_app
 from app.config import TestingConfig
 from app.extensions import db
-from app.services import gemini
+from app.services import llm
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -15,7 +15,7 @@ def app(tmp_path, monkeypatch):
     class Config(TestingConfig):
         STORAGE_ROOT = str(tmp_path / "storage")
 
-    monkeypatch.setattr(gemini, "get_llm", lambda: None)
+    monkeypatch.setattr(llm, "get_llm", lambda: None)
     application = create_app(Config)
     with application.app_context():
         db.create_all()

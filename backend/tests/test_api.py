@@ -49,10 +49,12 @@ def test_property_detail(seeded):
     assert response.json["dummy"] is False
 
 
-def test_model_run_and_decision(client):
-    api_client = client
+def test_model_run_and_decision(seeded):
+    api_client = seeded
     run_response = api_client.post("/api/v1/model-runs", json={"portfolioId": "SYN-PORT-142"})
     assert run_response.status_code == 202
+    assert run_response.json["dummy"] is False
+    assert run_response.json["configuration"]["summary"]["propertyCount"] > 0
     run_id = run_response.json["id"]
     decision = api_client.post(
         f"/api/v1/model-runs/{run_id}/decision",
@@ -60,13 +62,76 @@ def test_model_run_and_decision(client):
     )
     assert decision.status_code == 200
     assert decision.json["status"] == "approved"
+    summary = api_client.get("/api/v1/portfolios/SYN-PORT-142/summary")
+    assert summary.json["portfolioAalKes"] is not None
+    property_response = api_client.get("/api/v1/properties/NBO-0002")
+    assert property_response.json["loss"]["loss100Kes"] is not None
+    report = api_client.get(f"/api/v1/model-runs/{run_id}/report")
+    assert report.status_code == 200
+    latest = api_client.get("/api/v1/model-runs?portfolioId=SYN-PORT-142")
+    assert latest.json["items"][0]["status"] == "approved"
 
 
-def test_chat_contract(client):
-    response = client.post("/api/v1/chat", json={"message": "Explain NBO-0002", "mode": "analysis"})
+def test_chat_contract(seeded, monkeypatch):
+    from app.services import chat_provider
+
+    uploads = seeded.get("/api/v1/portfolios/SYN-PORT-142/uploads").json["items"]
+    source_id = uploads[0]["id"]
+    observed = {}
+    def fake_answer(prompt):
+        observed["prompt"] = prompt
+        return "The selected file has synthetic exposure rows.", "claude", "test-model"
+    monkeypatch.setattr(chat_provider, "answer", fake_answer)
+    response = seeded.post("/api/v1/chat", json={"message": "What is in this dataset?", "mode": "analysis", "context": {"portfolioId": "SYN-PORT-142", "uploadIds": [source_id]}})
     assert response.status_code == 200
-    assert response.json["dummy"] is True
-    assert response.json["provider"] == "gemini"
+    assert response.json["dummy"] is False
+    assert response.json["provider"] == "claude"
+    assert "reference_sample.csv" in observed["prompt"]
+    assert "row" in observed["prompt"]
+
+
+def test_chat_rejects_source_from_another_portfolio(seeded):
+    response = seeded.post("/api/v1/chat", json={"message": "Summarise this file", "context": {"portfolioId": "SYN-PORT-142", "uploadIds": ["not-an-upload"]}})
+    assert response.status_code == 404
+
+
+def test_chat_tries_claude_then_gemini(monkeypatch):
+    from app.services import chat_provider
+
+    calls = []
+    def claude_down(_prompt):
+        calls.append("claude")
+        raise chat_provider.ChatProviderError("Claude request failed: credit balance is too low")
+    def gemini_up(_prompt):
+        calls.append("gemini")
+        return "Grounded answer", "gemini-3.8-flash"
+    monkeypatch.setattr(chat_provider, "_claude", claude_down)
+    monkeypatch.setattr(chat_provider, "_gemini", gemini_up)
+    assert chat_provider.answer("question") == ("Grounded answer", "gemini", "gemini-3.8-flash")
+    assert calls == ["claude", "gemini"]
+
+
+def test_claude_code_key_is_accepted_for_chat(monkeypatch):
+    from types import SimpleNamespace
+    from app.services import chat_provider
+
+    from app.services import llm
+
+    observed = {}
+    class FakeClaude:
+        def __init__(self, api_key, timeout):
+            observed["key"] = api_key
+            self.beta = self.messages = self
+        def create(self, **kwargs):
+            observed["model"] = kwargs["model"]
+            return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="Grounded answer")])
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE", "test-api-key")
+    monkeypatch.setattr(llm.anthropic, "Anthropic", FakeClaude)
+    assert chat_provider.answer("question") == ("Grounded answer", "claude", llm.MODEL)
+    assert observed["key"] == "test-api-key"
+    assert observed["model"] == llm.MODEL
 
 
 def test_exposure_validation_and_calculation_contract(client):

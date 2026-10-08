@@ -4,7 +4,7 @@ import pytest
 
 from app.extensions import db
 from app.models import HazardReferencePoint, Property, ValidationIssue
-from app.services import gemini, geocoding
+from app.services import geocoding, llm
 from app.services.geocoding import GeocodeResult, GeocodingError
 from conftest import FIXTURES
 
@@ -225,11 +225,11 @@ def test_loc_id_is_locked_once_live(seeded):
 
 def test_low_confidence_mapping_is_queued_and_confirmable(seeded, monkeypatch):
     class LowConfidence:
-        def json(self, system, user):
+        def json(self, system, user, schema=None):
             pairs = [("loc_id", "Site"), ("lat", "Y"), ("lon", "X"), ("housing_class", "Type"), ("floor_area_m2", "Area"), ("cost_per_m2_kes", "Rate")]
             return {"mappings": [{"field": field, "column": column, "confidence": 0.6} for field, column in pairs]}
 
-    monkeypatch.setattr(gemini, "get_llm", lambda: LowConfidence())
+    monkeypatch.setattr(llm, "get_llm", lambda: LowConfidence())
     item = rows(seeded, upload(seeded, "Site,Y,X,Type,Area,Rate\nLC-1,-1.2585,36.8556,semi_permanent,40,10000\n")["id"])[0]
     queue = seeded.get(f"{BASE}/review-queue").json["items"]
     assert [(entry["id"], entry["reason"]) for entry in queue] == [(item["id"], "unconfirmed")]

@@ -6,10 +6,11 @@ from sqlalchemy import or_
 from werkzeug.datastructures import FileStorage
 
 from ..extensions import db
-from ..models import FieldProvenance, Upload, UploadRow, ValidationIssue
+from ..models import DocumentFact, FieldProvenance, Upload, UploadRow, ValidationIssue
 from ..services.ingestion import IngestionError, receive_upload
 from ..services.ingestion.pipeline import storage_root
-from ..services.ingestion.review import ReviewError, decide, queue_reason, review_queue_query
+from ..services.ingestion.pipeline import reprocess_upload
+from ..services.ingestion.review import ReviewError, decide, delete_upload, queue_reason, reset_for_reprocess, review_queue_query
 from .swagger_models import error_model
 
 
@@ -62,7 +63,8 @@ def upload_dict(upload: Upload) -> dict:
         "id": upload.id, "portfolioId": upload.portfolio_id, "filename": upload.filename, "mediaType": upload.media_type,
         "sizeBytes": upload.size_bytes, "sha256": upload.sha256, "status": upload.status, "attestation": upload.attestation,
         "extractor": upload.extractor, "summary": upload.summary, "error": upload.error,
-        "issueCounts": dict(severities), "createdAt": iso(upload.created_at),
+        "issueCounts": dict(severities), "factCount": DocumentFact.query.filter_by(upload_id=upload.id).count(),
+        "createdAt": iso(upload.created_at),
     }
 
 
@@ -125,6 +127,47 @@ class UploadResource(Resource):
     def get(self, upload_id):
         """Return the upload manifest, status, mapping summary, and issue counts."""
         return upload_dict(get_upload_or_404(upload_id))
+
+    @ns.response(204, "Upload deleted")
+    @ns.response(404, "Upload not found", error_model)
+    @ns.response(409, "Upload is still processing", error_model)
+    def delete(self, upload_id):
+        """Delete an upload, its rows, issues, facts and stored file. Properties it last wrote revert to their previous version or are removed."""
+        upload = get_upload_or_404(upload_id)
+        if upload.status in ("queued", "extracting", "validating"):
+            return {"error": "processing", "message": "The upload is still being processed; try again when it finishes."}, 409
+        try:
+            delete_upload(upload_id, storage_root())
+        except ReviewError as exc:
+            return {"error": "delete_failed", "message": exc.message}, exc.status
+        return "", 204
+
+
+@ns.route("/<string:upload_id>/reprocess")
+class UploadReprocessResource(Resource):
+    @ns.response(202, "Reprocessing started")
+    @ns.response(404, "Upload not found", error_model)
+    @ns.response(409, "Upload is still processing", error_model)
+    def post(self, upload_id):
+        """Parse the stored original again (for example after the Claude key was added). Derived rows, issues and facts are rebuilt."""
+        upload = get_upload_or_404(upload_id)
+        if upload.status in ("queued", "extracting", "validating"):
+            return {"error": "processing", "message": "The upload is already being processed."}, 409
+        upload = reset_for_reprocess(upload_id)
+        return upload_dict(reprocess_upload(upload)), 202
+
+
+@ns.route("/<string:upload_id>/facts")
+class UploadFactsResource(Resource):
+    @ns.response(404, "Upload not found", error_model)
+    def get(self, upload_id):
+        """Document-level facts, terms, claims and opinions extracted from a document, each with its quote and page."""
+        get_upload_or_404(upload_id)
+        facts = DocumentFact.query.filter_by(upload_id=upload_id).order_by(DocumentFact.page, DocumentFact.key).all()
+        return {"items": [{
+            "id": fact.id, "key": fact.key, "label": fact.label, "value": fact.value, "kind": fact.kind,
+            "page": fact.page, "quote": fact.quote, "confidence": fact.confidence, "verified": fact.verified,
+        } for fact in facts], "total": len(facts)}
 
 
 @ns.route("/<string:upload_id>/rows")

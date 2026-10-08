@@ -1,10 +1,20 @@
 from flask_restx import Namespace, Resource, reqparse
 
 from ..services import geocoding
+from ..models import Hotspot
 from .swagger_models import error_model, geocode_response
 
 
 ns = Namespace("locations", description="Server-side geocoding (Google Geocoding API)", path="/locations")
+
+
+@ns.route("/hotspots")
+class HotspotsResource(Resource):
+    def get(self):
+        """Return uploaded reference hotspots for the workspace map."""
+        items = Hotspot.query.order_by(Hotspot.name).all()
+        return {"items": [{"id": item.id, "name": item.name, "latitude": item.latitude,
+                           "longitude": item.longitude, "severity": item.severity} for item in items], "total": len(items)}
 
 geocode_parser = reqparse.RequestParser()
 geocode_parser.add_argument("q", type=str, required=True, location="args", help="Address, neighbourhood, or place in Nairobi")

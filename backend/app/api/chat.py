@@ -2,6 +2,7 @@ from flask import request
 from flask_restx import Namespace, Resource
 
 from ..services import dummy
+from ..services import chat as chat_service
 from .swagger_models import (
     chat_create_request,
     chat_model,
@@ -20,10 +21,13 @@ chats_ns = Namespace("chats", description="Persistent recent-chat history", path
 @chat_ns.route("")
 class ChatResource(Resource):
     @chat_ns.expect(chat_request, validate=True)
-    @chat_ns.marshal_with(chat_response_model)
+    @chat_ns.response(200, "Grounded analyst response", chat_response_model)
     def post(self):
         """Generate an analyst response or parse a proposed synthetic exposure."""
-        return dummy.chat_response(request.get_json())
+        try:
+            return chat_ns.marshal(chat_service.respond(request.get_json() or {}), chat_response_model)
+        except chat_service.ChatError as exc:
+            return {"error": "chat_unavailable", "message": str(exc)}, exc.status
 
 
 @chats_ns.route("")
@@ -70,4 +74,3 @@ class ChatMessagesResource(Resource):
         if message is None:
             chats_ns.abort(404, f"Chat {chat_id} was not found.")
         return message, 201
-

@@ -175,6 +175,7 @@ chat_context_model = api.model("ChatContext", {
     "portfolioId": fields.String(required=False),
     "propertyId": fields.String(required=False),
     "runId": fields.String(required=False),
+    "uploadIds": fields.List(fields.String, required=False),
 })
 
 chat_request = api.model("ChatRequest", {
@@ -189,8 +190,9 @@ chat_response_model = api.model("ChatResponse", {
     "source": fields.String,
     "citations": fields.List(fields.Raw),
     "actions": fields.List(fields.Raw),
-    "provider": fields.String(example="gemini"),
-    "model": fields.String(example="gemini-3.8-flash"),
+    "workflow": fields.Raw(description="Model run backing the answer: {runId, status, created}. status=review means it awaits approval."),
+    "provider": fields.String(example="claude"),
+    "model": fields.String(example="claude-opus-5-5"),
     "dummy": fields.Boolean,
 })
 

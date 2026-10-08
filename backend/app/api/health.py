@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from flask import current_app
 from flask_restx import Namespace, Resource
 
+from ..services import llm
+
 
 ns = Namespace("health", description="Service health and deployment checks", path="/health")
 
@@ -33,6 +35,6 @@ class ReadinessResource(Resource):
         """Return prototype readiness; database queries are intentionally deferred."""
         return {
             "ready": True,
-            "checks": {"api": "ready", "database": "configured", "gemini": "dummy"},
+            "checks": {"api": "ready", "database": "configured", "claude": "configured" if llm.get_llm() else "missing ANTHROPIC_API_KEY"},
             "timestamp": datetime.now(UTC).isoformat(),
         }

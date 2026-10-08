@@ -7,7 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import BinaryIO
 
-EXTRACTORS = {".csv": "csv", ".xlsx": "excel", ".pdf": "pdf_text", ".txt": "text", ".md": "text"}
+EXTRACTORS = {".csv": "csv", ".xlsx": "excel", ".pdf": "pdf", ".docx": "docx", ".txt": "text", ".md": "text"}
+STORE_ONLY = "none"  # any other file type is kept and hashed, but not parsed
 HEAD_BYTES = 8192
 
 
@@ -43,14 +44,12 @@ def save_stream(stream: BinaryIO, tmp_dir: Path, max_bytes: int) -> tuple[Path, 
 
 
 def detect_extractor(filename: str, head: bytes) -> str:
-    """Check the extension and the file's leading bytes agree before anything parses it."""
+    """Pick the parser for a file. Known types must match their leading bytes; anything else is stored only."""
     extension = Path(filename).suffix.lower()
-    extractor = EXTRACTORS.get(extension)
-    if extractor is None:
-        raise StorageError("wrong_type", f"Unsupported file type '{extension or filename}'. Use CSV, XLSX, PDF, TXT, or MD.")
-    if extractor == "excel" and not head.startswith(b"PK\x03\x04"):
-        raise StorageError("wrong_type", "The file has an .xlsx extension but is not an Excel workbook.")
-    if extractor == "pdf_text" and not head.startswith(b"%PDF-"):
+    extractor = EXTRACTORS.get(extension, STORE_ONLY)
+    if extractor in ("excel", "docx") and not head.startswith(b"PK\x03\x04"):
+        raise StorageError("wrong_type", f"The file has a {extension} extension but is not a valid Office document.")
+    if extractor == "pdf" and not head.startswith(b"%PDF-"):
         raise StorageError("wrong_type", "The file has a .pdf extension but is not a PDF.")
     if extractor in ("csv", "text") and b"\x00" in head:
         raise StorageError("wrong_type", "The file looks binary, not text.")

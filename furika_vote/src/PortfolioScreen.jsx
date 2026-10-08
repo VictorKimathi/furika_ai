@@ -21,20 +21,12 @@ import {
   X,
 } from 'lucide-react';
 import './portfolio.css';
+import { API_BASE_URL, PORTFOLIO_ID, apiGet } from './api.js';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
-const PORTFOLIO_ID = import.meta.env.VITE_PORTFOLIO_ID || 'SYN-PORT-142';
 const HOUSING_LABEL = { informal_iron_sheet:'Informal iron sheet', semi_permanent:'Semi-permanent', permanent_masonry:'Permanent masonry' };
 const BAND_LABEL = { low:'Low', moderate:'Moderate', high:'High', severe:'Severe', pending:'Pending' };
 const CLUSTER_TYPES = { Neighbourhood:'neighbourhood', Grid:'grid', 'Hazard band':'hazard_band', 'Housing class':'housing_class' };
 const NAIROBI_BOUNDS = { latMin:-1.5, latMax:-1.1, lngMin:36.6, lngMax:37.1 };
-
-async function apiGet(path) {
-  const response = await fetch(`${API_BASE_URL}${path}`);
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`);
-  return body;
-}
 
 const millions = (value) => value == null ? null : value / 1e6;
 
@@ -193,7 +185,7 @@ function PropertyDrawer({ property, full, setFull, onClose, onAsk }) {
 function ClusterAnalytics({ clusters, status }) {
   const top = clusters.slice(0,4);
   const hasProbability = top.some((cluster)=>cluster.annualFloodProbability!=null);
-  const mix = (cluster) => { const informal=(cluster.classMix.informal||0)*100; const semi=(cluster.classMix.semiPermanent||0)*100; return `conic-gradient(#087f91 0 ${informal}%,#ef9f23 ${informal}% ${informal+semi}%,#7658a2 ${informal+semi}% 100%)`; };
+  const mix = (cluster) => { const informal=(cluster.classMix.informal||0)*100; const semi=(cluster.classMix.semiPermanent||0)*100; return `conic-gradient(#041d3b 0 ${informal}%,#ef9f23 ${informal}% ${informal+semi}%,#7658a2 ${informal+semi}% 100%)`; };
   return <section className="cluster-analytics"><div className="section-heading"><div><span>PORTFOLIO ACCUMULATION</span><h2>Clusters and concentration</h2></div><button><Download size={14}/> Export cluster view</button></div>{top.length?<><div className="analytics-grid"><div className="treemap-card"><header><strong>Value concentration</strong><span>Size = insured value · colour = risk (grey = pending)</span></header><div className="treemap">{top.map((cluster,index)=><div key={cluster.id} className={`tree-${index} ${cluster.riskBand}`}><strong>{cluster.name}</strong><span>{kes(cluster.insuredValueKes)}</span><small>{cluster.propertyCount} properties</small></div>)}</div></div><div className="bubble-card"><header><strong>Value vs. risk</strong><span>Bubble size = cluster TIV</span></header>{hasProbability?<div className="bubble-chart"><span className="axis-y">INSURED VALUE</span><span className="axis-x">FLOOD PROBABILITY →</span>{top.map((cluster,index)=>{ const value=cluster.insuredValueKes/1e6; return <button key={cluster.id} className={cluster.riskBand} style={{left:`${12+(cluster.annualFloodProbability||0)*300}%`,bottom:`${15+value/15}%`,width:`${28+value/30}px`,height:`${28+value/30}px`}} title={`${cluster.name}: ${kes(cluster.insuredValueKes)}`}><span>{index+1}</span></button>; })}</div>:<div className="loss-unavailable"><BarChart3 size={19}/><strong>Flood probability pending</strong><span>Cluster risk is plotted after an approved model run.</span></div>}</div></div><div className="cluster-cards">{top.map((cluster)=><article key={cluster.id}><header><div><span className={`cluster-dot ${cluster.riskBand}`}/><strong>{cluster.name}</strong></div><em>{cluster.accumulationFlag?.replaceAll('_',' ') || (cluster.riskBand==='pending'?'Risk pending':'')}</em></header><div className="cluster-metrics"><div><span>PROPERTIES</span><strong>{cluster.propertyCount}</strong></div><div><span>INSURED VALUE</span><strong>{kes(cluster.insuredValueKes)}</strong></div><div><span>1-IN-100 LOSS</span><strong>{kes(cluster.loss100Kes)}</strong></div><div><span>AAL / TIV</span><strong>{cluster.aalPercentTiv!=null?`${cluster.aalPercentTiv}%`:'—'}</strong></div></div><div className="cluster-foot"><div className="class-mix" style={{background:mix(cluster)}}/><span>{cluster.tivShare!=null?`${(cluster.tivShare*100).toFixed(1)}% of portfolio TIV`:'—'}</span><small>{cluster.annualFloodProbability!=null?`Avg flood probability ${(cluster.annualFloodProbability*100).toFixed(1)}%`:'Flood probability pending'}</small></div></article>)}</div></>:<div className="loss-unavailable"><Layers3 size={19}/><strong>{status==='error'?'Clusters unavailable':status==='ready'?'No clusters yet':'Loading clusters…'}</strong><span>{status==='ready'?'Upload or seed properties to see accumulation.':''}</span></div>}</section>;
 }
 

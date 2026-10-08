@@ -1,6 +1,6 @@
 # Furika AI Flask backend
 
-Backend for the Furika AI catastrophe-modelling frontend. Portfolio, property and upload routes read PostgreSQL; model-run, chat and export routes still return deterministic demo data. The modelling routes execute real, auditable score-to-depth, vulnerability, property-loss, EP, AAL, accumulation, and sensitivity calculations. Replace functions in `app/services/dummy.py` with PostgreSQL repositories, workers, and Gemini calls later; the frontend-facing routes do not need to change.
+Backend for the Furika AI catastrophe-modelling frontend. Portfolio, property, upload, chat and model-run routes read PostgreSQL. Model runs calculate score-to-depth, vulnerability, property-loss, EP and AAL from confirmed uploaded properties and publish results after review. Chat retrieves selected uploaded rows and document text, then tries Gemini followed by Claude. Some other routes still expose prototype behavior.
 
 ## Quick start
 
@@ -79,28 +79,30 @@ All versioned endpoints use `/api/v1`.
 | GET | `/properties/{id}/hazard` | Hazard-only detail |
 | GET | `/properties/{id}/loss` | Loss and EP curve |
 | GET | `/properties/{id}/provenance` | Field-by-field source of uploaded values |
-| GET/POST | `/portfolios/{id}/uploads` | List uploads / upload a CSV, XLSX, PDF, TXT, or MD file (multipart: `file`, `attestation`=`synthetic`\|`redacted`) |
-| GET | `/uploads/{id}` | Upload manifest, status, column mapping, issue counts |
+| GET/POST | `/portfolios/{id}/uploads` | List uploads / upload any file (multipart: `file`, `attestation`=`synthetic`\|`redacted`); CSV/XLSX and PDF/DOCX/TXT/MD are parsed |
+| GET | `/portfolios/{id}/documents/search?q=` | Search uploaded document text (file, page, snippet) |
+| GET/DELETE | `/uploads/{id}` | Upload manifest, status, mapping, issue counts / delete the upload and revert its properties |
+| GET | `/uploads/{id}/facts` | Facts, terms, claims and opinions extracted from a document |
 | GET | `/uploads/{id}/rows?status=` | Staged rows with issues and provenance |
 | GET | `/uploads/{id}/issues` | All validation issues |
 | GET | `/uploads/{id}/original` | Download the untouched original |
 | GET | `/portfolios/{id}/review-queue` | Rows needing review and unconfirmed properties |
 | POST | `/upload-rows/{id}/decision` | `confirm` / `reject` / `edit` a staged row |
 | GET | `/locations/geocode?q=...` | Google geocoding (needs `GOOGLE_MAPS_API_KEY`) with precision |
-| POST | `/model-runs` | Start workflow |
+| GET/POST | `/model-runs` | Resume latest portfolio run / calculate a new run for review |
 | GET | `/model-runs/{id}` | Workflow status and stages |
 | GET | `/model-runs/{id}/events` | Server-Sent Event stream |
 | GET | `/model-runs/{id}/stages/{stage}/output` | Stage output and provenance |
 | POST | `/model-runs/{id}/decision` | Approve or return human gate |
-| POST | `/model-runs/{id}/cancel` | Cancel workflow |
-| GET | `/model-runs/{id}/report` | Underwriter report/export |
+| POST | `/model-runs/{id}/cancel` | Returns 409 for synchronous review runs |
+| GET | `/model-runs/{id}/report` | Approved JSON summary |
 | POST | `/modelling/validate-exposure` | Validate canonical exposure rows and TIV reconciliation |
 | POST | `/modelling/damage-ratio` | Evaluate normalized vulnerability curves |
 | POST | `/modelling/calculate` | Execute hazard → loss → EP → AAL calculations |
 | POST | `/modelling/ep-curve` | Build/interpolate the occurrence EP curve and AAL range |
 | POST | `/modelling/hotspot-uplift` | Calculate distance-decayed hotspot uplift |
 | POST | `/modelling/sensitivity` | Run D-max sensitivity scenarios |
-| POST | `/chat` | Dummy AI analysis/exposure parsing |
+| POST | `/chat` | Answer from selected upload IDs or a portfolio property ID; Gemini then Claude fallback |
 | GET/POST | `/chats` | Recent chats/create chat |
 | GET/POST | `/chats/{id}/messages` | Read/append messages |
 | DELETE | `/chats/{id}` | Delete chat |
@@ -113,22 +115,15 @@ Set the React app's environment value:
 VITE_API_BASE_URL=http://localhost:5000/api/v1
 ```
 
-The Google Maps browser key remains in the frontend and should be restricted by HTTP referrer. Keep `GEMINI_API_KEY`, PostgreSQL credentials, session secrets, and future model credentials in the backend only. The current Gemini adapter returns dummy data and does not make external model calls yet.
+The Google Maps browser key remains in the frontend and should be restricted by HTTP referrer. Keep `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` (or your existing `CLAUDE_CODE` Anthropic API key), PostgreSQL credentials, and session secrets in the backend only. Chat tries Gemini and retries with Claude when Gemini fails.
 
-## Dummy-service boundary
+## Remaining prototype routes
 
-All placeholder behavior lives in `app/services/dummy.py`. A later implementation can introduce:
-
-- `PostgresPortfolioRepository` for SQLAlchemy queries;
-- `CatModelService` for hazard, vulnerability, and financial-loss execution;
-- a worker queue for asynchronous runs;
-- object storage for reports and exports;
-- `GeminiService` for grounded analyst responses and exposure parsing;
-- Google server-side geocoding if desired.
-
-Keep the response schemas and route paths stable while replacing these functions.
+Authentication, chat history and portfolio export still have placeholder implementations. Model runs are synchronous and require a human approve/return decision before their calculated results are published.
 
 ## Uploads
+
+Parsing uses Claude (`ANTHROPIC_API_KEY` in `.env`): spreadsheet column mapping and PDF/DOCX/text extraction, with every extracted value checked against a verbatim quote in the document. Documents are processed in a background thread; poll `/uploads/{id}`.
 
 Originals are written once to `STORAGE_ROOT` (default `backend/storage/`, git-ignored), hashed with SHA-256, and made read-only. CSV and Excel rows are mapped to the canonical schema (exact headers first, then Gemini when `GEMINI_API_KEY` is set), validated per row, and promoted to `properties` when accepted. See `docs/ingestion-plan.md` for issue codes and the confirmation rule.
 

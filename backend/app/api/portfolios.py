@@ -119,3 +119,21 @@ class PortfolioReviewQueueResource(Resource):
         """Rows awaiting a reviewer: needs_review rows and properties left unconfirmed by low-confidence AI mapping."""
         args = queue_parser.parse_args()
         return portfolio_review_queue(portfolio_id, args["limit"], args["offset"])
+
+
+search_parser = reqparse.RequestParser()
+search_parser.add_argument("q", type=str, required=True, location="args", help="Words to find in uploaded documents")
+search_parser.add_argument("limit", type=int, location="args", default=10)
+
+
+@ns.route("/<string:portfolio_id>/documents/search")
+class PortfolioDocumentSearchResource(Resource):
+    @ns.expect(search_parser)
+    @ns.response(400, "Invalid query", error_model)
+    def get(self, portfolio_id):
+        """Search the text of uploaded documents; each hit carries its file, page and a snippet."""
+        args = search_parser.parse_args()
+        try:
+            return repository.search_documents(portfolio_id, args["q"], args["limit"])
+        except RepositoryError as exc:
+            ns.abort(exc.status, exc.message)

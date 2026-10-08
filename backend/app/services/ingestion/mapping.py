@@ -27,7 +27,7 @@ MAPPING_SYSTEM = (
     "You map spreadsheet columns to the canonical Furika exposure schema. "
     "Map a column only when its header and sample values clearly mean the same thing in the same units. "
     "Never invent a column name and never map one column to two fields. Leave out fields with no matching column. "
-    'Return JSON: {"mappings": [{"field": "<canonical field>", "column": "<exact column header>", "confidence": <0-1>}]}'
+    "Confidence is 0-1."
 )
 
 
@@ -60,8 +60,23 @@ def map_columns(columns: list[str], samples: dict[str, list[str]], llm) -> tuple
         },
         ensure_ascii=False,
     )
+    schema = {
+        "type": "object",
+        "properties": {"mappings": {"type": "array", "items": {
+            "type": "object",
+            "properties": {
+                "field": {"type": "string", "enum": unmapped},
+                "column": {"type": "string", "enum": free},
+                "confidence": {"type": "number"},
+            },
+            "required": ["field", "column", "confidence"],
+            "additionalProperties": False,
+        }}},
+        "required": ["mappings"],
+        "additionalProperties": False,
+    }
     try:
-        response = llm.json(MAPPING_SYSTEM, prompt)
+        response = llm.json(MAPPING_SYSTEM, prompt, schema=schema)
     except Exception as exc:  # network, quota, or malformed output: fall back to exact matches only
         return mapping, [{
             "code": "ai_mapping_unavailable",

@@ -7,7 +7,7 @@ import pandas as pd
 
 from app.extensions import db
 from app.models import FieldProvenance, Property, Upload
-from app.services import gemini
+from app.services import llm
 
 
 PORTFOLIO = "SYN-PORT-TEST"
@@ -24,7 +24,7 @@ class FakeLLM:
         self.error = error
         self.calls = []
 
-    def json(self, system, user):
+    def json(self, system, user, schema=None):
         self.calls.append(user)
         if self.error:
             raise self.error
@@ -94,13 +94,14 @@ def test_extension_must_match_content(client):
     response = post(client, b"not a pdf", filename="memo.pdf")
     assert response.status_code == 400
     assert response.json["error"] == "wrong_type"
-    assert post(client, b"a,b", filename="data.exe").json["error"] == "wrong_type"
+    assert post(client, b"plain text, not a zip", filename="memo.docx").json["error"] == "wrong_type"
 
 
-def test_pdf_is_stored_until_extractor_exists(client):
-    response = post(client, b"%PDF-1.7\n...", filename="memo.pdf", attestation="redacted")
+def test_unknown_types_are_stored_only(client):
+    response = post(client, b'{"type": "FeatureCollection"}', filename="hotspots.geojson")
     assert response.status_code == 201
-    assert response.json["status"] == "pending_extractor"
+    assert response.json["status"] == "stored"
+    assert response.json["extractor"] == "none"
 
 
 def test_row_level_errors_are_coded(client):
@@ -164,8 +165,8 @@ def renamed_mapping(confidence):
 
 
 def test_high_confidence_ai_mapping_is_confirmed(client, monkeypatch):
-    llm = FakeLLM(renamed_mapping(0.95))
-    monkeypatch.setattr(gemini, "get_llm", lambda: llm)
+    fake = FakeLLM(renamed_mapping(0.95))
+    monkeypatch.setattr(llm, "get_llm", lambda: fake)
     body = post(client, RENAMED).json
     assert body["summary"]["mapping"]["lat"]["method"] == "ai_mapped"
     assert body["summary"]["unmappedColumns"] == ["Notes"]
@@ -176,7 +177,7 @@ def test_high_confidence_ai_mapping_is_confirmed(client, monkeypatch):
 
 
 def test_low_confidence_ai_mapping_is_unconfirmed(client, monkeypatch):
-    monkeypatch.setattr(gemini, "get_llm", lambda: FakeLLM(renamed_mapping(0.6)))
+    monkeypatch.setattr(llm, "get_llm", lambda: FakeLLM(renamed_mapping(0.6)))
     post(client, RENAMED)
     assert db.session.get(Property, "R-1").review_status == "unconfirmed"
 
@@ -184,14 +185,14 @@ def test_low_confidence_ai_mapping_is_unconfirmed(client, monkeypatch):
 def test_invented_ai_columns_are_ignored(client, monkeypatch):
     response = renamed_mapping(0.95)
     response["mappings"][0]["column"] = "Building Reference"  # not a real header
-    monkeypatch.setattr(gemini, "get_llm", lambda: FakeLLM(response))
+    monkeypatch.setattr(llm, "get_llm", lambda: FakeLLM(response))
     body = post(client, RENAMED).json
     assert "loc_id" in body["summary"]["unmappedFields"]
     assert body["summary"]["byStatus"] == {"rejected": 1}
 
 
 def test_ai_failure_falls_back_to_exact(client, monkeypatch):
-    monkeypatch.setattr(gemini, "get_llm", lambda: FakeLLM(error=TimeoutError("timed out")))
+    monkeypatch.setattr(llm, "get_llm", lambda: FakeLLM(error=TimeoutError("timed out")))
     body = post(client, RENAMED).json
     assert body["status"] == "done"
     issues = client.get(f"/api/v1/uploads/{body['id']}/issues").json["items"]

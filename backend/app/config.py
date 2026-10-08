@@ -32,15 +32,17 @@ class Config:
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
         if origin.strip()
     ]
-    AI_PROVIDER = "gemini"
+    AI_PROVIDER = "claude"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = _gemini_model()
     STORAGE_ROOT = os.getenv("STORAGE_ROOT", str(Path(__file__).resolve().parent.parent / "storage"))
     UPLOAD_MAX_BYTES = 20 * 1024 * 1024
     MAX_CONTENT_LENGTH = UPLOAD_MAX_BYTES + 1024 * 1024
     AI_MAPPING_AUTO_CONFIRM = 0.9
+    INGESTION_ASYNC = True  # documents are extracted in a background thread
 
 
 class TestingConfig(Config):
     TESTING = True
+    INGESTION_ASYNC = False
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"

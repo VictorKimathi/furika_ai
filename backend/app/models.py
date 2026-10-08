@@ -258,3 +258,33 @@ class Hotspot(TimestampMixin, db.Model):
     severity = db.Column(db.String(20))
     weight = db.Column(db.Float)
     source_sha256 = db.Column(db.String(64))
+
+
+class DocumentChunk(TimestampMixin, db.Model):
+    """Searchable text from uploaded documents (one row per chunk of a page)."""
+
+    __tablename__ = "document_chunks"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
+    portfolio_id = db.Column(db.String(64), db.ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True)
+    page = db.Column(db.Integer)
+    chunk_index = db.Column(db.Integer, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+
+
+class DocumentFact(TimestampMixin, db.Model):
+    """Document-level statements (terms, claims, opinions) that are not per-building fields."""
+
+    __tablename__ = "document_facts"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
+    key = db.Column(db.String(60), nullable=False)
+    label = db.Column(db.String(255))
+    value = db.Column(db.Text)
+    kind = db.Column(db.String(20), nullable=False)
+    page = db.Column(db.Integer)
+    quote = db.Column(db.Text)
+    confidence = db.Column(db.Float)
+    verified = db.Column(db.Boolean, nullable=False, default=False)

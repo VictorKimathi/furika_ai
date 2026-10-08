@@ -25,11 +25,9 @@ Add both keys to `.env`:
 ```env
 VITE_GOOGLE_MAPS_API_KEY=your_browser_restricted_google_maps_key
 VITE_API_BASE_URL=http://localhost:5000/api/v1
-OPENAI_API_KEY=your_server_side_openai_key
-OPENAI_MODEL=gpt-5-mini
 ```
 
-`VITE_GOOGLE_MAPS_API_KEY` is intentionally available to the browser and must be restricted by HTTP referrer in Google Cloud. `OPENAI_API_KEY` remains server-side and must never use the `VITE_` prefix.
+`VITE_GOOGLE_MAPS_API_KEY` is available to the browser and must be restricted by HTTP referrer. Chat uses the Flask backend. Set `GEMINI_API_KEY` and optionally `ANTHROPIC_API_KEY` or `CLAUDE_CODE` in `backend/.env`; never use a `VITE_` prefix for either server key.
 
 ## Run
 
@@ -45,4 +43,4 @@ npm run build
 npm start
 ```
 
-The app includes grounded local fallback answers when the OpenAI key is missing or temporarily unavailable. AI-extracted exposure records always require user confirmation before changing the session portfolio.
+The chatbot sends selected upload IDs to Flask. Flask retrieves parsed rows and document text and tries Gemini, then Claude. If neither provider is available, chat reports the error instead of inventing an answer.

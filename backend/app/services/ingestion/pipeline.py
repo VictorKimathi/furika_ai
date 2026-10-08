@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import shutil
+import threading
 from collections import Counter
 from pathlib import Path
 
@@ -16,17 +17,19 @@ from flask import current_app
 
 from ...extensions import db
 from ...models import FieldProvenance, Portfolio, Property, Upload, UploadRow, ValidationIssue, new_id
-from .. import gemini, geocoding
+from .. import geocoding, llm
+from . import documents
 from .enrichment import ReferenceData, RowContext, evaluate_row
 from .extract import cell, column_samples, read_table
 from .mapping import map_columns
-from .storage import StorageError, detect_extractor, save_stream
+from .storage import STORE_ONLY, StorageError, detect_extractor, save_stream
 from .validation import CANONICAL_FIELDS, HAZARD_FIELDS, PROMOTABLE_STATUSES, issue, row_status
 
 logger = logging.getLogger(__name__)
 
 ATTESTATIONS = ("synthetic", "redacted")
 TABLE_EXTRACTORS = ("csv", "excel")
+DOCUMENT_EXTRACTORS = ("pdf", "docx", "text")
 CONFIRMED_METHODS = {"exact", "user", "derived", "geocoded", "lookup"}
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 
@@ -88,8 +91,33 @@ def receive_upload(portfolio_id: str, file_storage, attestation: str) -> tuple[U
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    process_upload(upload)
+    if upload.extractor in DOCUMENT_EXTRACTORS and current_app.config.get("INGESTION_ASYNC"):
+        upload.status = "queued"
+        db.session.commit()
+        threading.Thread(target=_process_in_background, args=(current_app._get_current_object(), upload.id), daemon=True).start()
+    else:
+        process_upload(upload)
     return upload, True
+
+
+def reprocess_upload(upload: Upload) -> Upload:
+    """Parse an already-stored original again, in the background for documents."""
+    if upload.extractor in DOCUMENT_EXTRACTORS and current_app.config.get("INGESTION_ASYNC"):
+        upload.status = "queued"
+        db.session.commit()
+        threading.Thread(target=_process_in_background, args=(current_app._get_current_object(), upload.id), daemon=True).start()
+    else:
+        process_upload(upload)
+    return upload
+
+
+def _process_in_background(app, upload_id: str) -> None:
+    """Document extraction can take a minute or more; run it outside the request."""
+    with app.app_context():
+        upload = db.session.get(Upload, upload_id)
+        if upload is not None:
+            process_upload(upload)
+        db.session.remove()
 
 
 def process_upload(upload: Upload) -> None:
@@ -109,9 +137,12 @@ def _file_issue(upload: Upload, item: dict) -> None:
 
 
 def _process(upload: Upload) -> None:
-    if upload.extractor not in TABLE_EXTRACTORS:
-        upload.status = "pending_extractor"
-        upload.summary = {"note": "The original is stored. Extraction for this file type is not available yet."}
+    if upload.extractor == STORE_ONLY:
+        upload.status = "stored"
+        upload.summary = {"note": "Stored and hashed. This file type is not parsed yet."}
+        return
+    if upload.extractor in DOCUMENT_EXTRACTORS:
+        _process_document(upload)
         return
 
     upload.status = "extracting"
@@ -121,6 +152,11 @@ def _process(upload: Upload) -> None:
         _file_issue(upload, issue("unreadable", "error", f"The file could not be read as a table: {exc}"))
         upload.status = "rejected"
         return
+    process_frame(upload, frame, sheet)
+
+
+def process_frame(upload: Upload, frame, sheet: str | None, row_label: str | None = None) -> None:
+    """Map, validate and promote the rows of a table (spreadsheet, or a table read out of a PDF)."""
     if frame.empty or not len(frame.columns):
         _file_issue(upload, issue("empty_file", "error", "The file has no data rows."))
         upload.status = "rejected"
@@ -128,7 +164,7 @@ def _process(upload: Upload) -> None:
 
     frame.columns = [str(column) for column in frame.columns]
     columns = list(frame.columns)
-    mapping, notes = map_columns(columns, column_samples(frame), gemini.get_llm())
+    mapping, notes = map_columns(columns, column_samples(frame), llm.get_llm())
     for note in notes:
         _file_issue(upload, note)
     mapped_columns = {entry["column"] for entry in mapping.values()}
@@ -149,7 +185,7 @@ def _process(upload: Upload) -> None:
             name: {"method": entry["method"], "source_column": entry["column"], "confidence": entry["confidence"]}
             for name, entry in mapping.items() if raw[name] is not None
         }
-        row_ref = f"{sheet} row {position + 2}" if sheet else f"row {position + 2}"
+        row_ref = f"{row_label} {position + 1}" if row_label else f"{sheet} row {position + 2}" if sheet else f"row {position + 2}"
         row = UploadRow(id=new_id(), upload_id=upload.id, row_ref=row_ref, position=position, data={}, status="received")
         db.session.add(row)
         extra = {column: record[column] for column in extra_columns if record[column] is not None}
@@ -181,13 +217,37 @@ def _process(upload: Upload) -> None:
     upload.status = "done"
 
 
+def _process_document(upload: Upload) -> None:
+    ctx = row_context()
+    existing: dict[str, Property] = {}
+    seen: set[str] = set()
+    positions = iter(range(10_000))
+
+    def evaluate_building(raw: dict, sources: dict, extra_issues: list[dict], label: str) -> dict:
+        loc_id = raw.get("loc_id")
+        if loc_id and loc_id not in existing and (current := db.session.get(Property, loc_id)) is not None:
+            existing[loc_id] = current
+        row = UploadRow(id=new_id(), upload_id=upload.id, row_ref=f"{label} (document)"[:160], position=next(positions), data={}, status="received")
+        db.session.add(row)
+        data, _ = evaluate_and_record(upload, row, raw, sources, {}, ctx, existing, seen, extra_issues)
+        if row.status in PROMOTABLE_STATUSES:
+            promote(upload, row, data, is_confirmed(data), existing.get(data["loc_id"]))
+        return {**data, "_status": row.status}
+
+    documents.process_document(
+        upload, storage_root() / upload.storage_path, evaluate_building,
+        process_table=lambda frame: process_frame(upload, frame, None, row_label="PDF table row"),
+    )
+
+
 def row_context() -> RowContext:
     return RowContext(reference=ReferenceData.load(), geocoder=geocoding.get_geocoder())
 
 
-def evaluate_and_record(upload, row, raw, sources, extra, ctx, existing, seen) -> tuple[dict, list[dict]]:
+def evaluate_and_record(upload, row, raw, sources, extra, ctx, existing, seen, extra_issues=None) -> tuple[dict, list[dict]]:
     """Evaluate one row, then write its data, status, issues and provenance. `seen` tracks loc_ids in this batch."""
     data, issues, filled = evaluate_row(raw, ctx)
+    issues.extend(extra_issues or [])
     data.update(raw=raw, sources=sources, extra=extra)
 
     loc_id = data["loc_id"]
@@ -221,6 +281,7 @@ def build_provenance(upload, row, data, sources, filled) -> list[FieldProvenance
             records.append(FieldProvenance(
                 subject_type="upload_row", subject_id=row.id, field=name, value=data.get(name), raw_value=data["raw"].get(name),
                 method=entry["method"], confidence=entry.get("confidence", 1.0), source_upload_id=upload.id, source_column=entry.get("source_column"),
+                quote=entry.get("quote"), page=entry.get("page"),
             ))
         elif name in filled:
             entry = filled[name]

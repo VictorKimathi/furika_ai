@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
+from datetime import UTC
 
 import numpy as np
 from sqlalchemy import false, func, or_
 
 from ..extensions import db
-from ..models import FieldProvenance, Hotspot, Portfolio, Property, UploadRow, ValidationIssue, new_id
+from ..models import DocumentChunk, FieldProvenance, HazardResult, Hotspot, LossResult, ModelRun, Portfolio, Property, Upload, UploadRow, ValidationIssue, new_id
 from . import furika_model as fm
 from .ingestion.enrichment import evaluate_row
 from .ingestion.pipeline import apply_row_data, row_context
@@ -44,7 +45,23 @@ def _hazard_scores(prop: Property) -> dict | None:
     return (prop.attributes or {}).get("hazard_scores")
 
 
-def property_item(prop: Property, issue_count: int = 0) -> dict:
+def _approved_run(portfolio_id: str) -> ModelRun | None:
+    run = ModelRun.query.filter_by(portfolio_id=portfolio_id, status="approved").order_by(ModelRun.completed_at.desc()).first()
+    if run is None:
+        return None
+    latest_property_change = db.session.query(func.max(Property.updated_at)).filter(Property.portfolio_id == portfolio_id).scalar()
+    if latest_property_change and run.completed_at and latest_property_change.replace(tzinfo=UTC) > run.completed_at.replace(tzinfo=UTC):
+        return None
+    return run
+
+
+def _risk_band(score: float | None) -> str:
+    if score is None:
+        return PENDING
+    return "extreme" if score >= .8 else "severe" if score >= .6 else "moderate" if score >= .4 else "occasional" if score >= .2 else "common"
+
+
+def property_item(prop: Property, issue_count: int = 0, hazard: HazardResult | None = None, loss: LossResult | None = None) -> dict:
     return {
         "id": prop.id,
         "portfolioId": prop.portfolio_id,
@@ -56,12 +73,12 @@ def property_item(prop: Property, issue_count: int = 0) -> dict:
         "floorAreaM2": _num(prop.floor_area_m2),
         "costPerM2Kes": _num(prop.cost_per_m2_kes),
         "insuredValueKes": _num(prop.insured_value_kes),
-        "hazardScore": None,
-        "hazardBand": PENDING,
-        "annualFloodProbability": None,
-        "aalKes": None,
-        "loss100Kes": None,
-        "loss250Kes": None,
+        "hazardScore": _num(hazard.hazard_score) if hazard else None,
+        "hazardBand": _risk_band(_num(hazard.hazard_score)) if hazard else PENDING,
+        "annualFloodProbability": _num(hazard.annual_flood_probability) if hazard else None,
+        "aalKes": _num(loss.aal_kes) if loss else None,
+        "loss100Kes": _num(loss.loss_100_kes) if loss else None,
+        "loss250Kes": _num(loss.loss_250_kes) if loss else None,
         "cluster": prop.region,
         "aiFlagged": None,
         "sourceTag": prop.source_tag,
@@ -75,19 +92,25 @@ def property_item(prop: Property, issue_count: int = 0) -> dict:
 
 
 def _issues_for(property_ids: list[str]) -> dict[str, list[ValidationIssue]]:
-    """Warnings and review items from the upload row that last wrote each property."""
+    """Warnings and review items from the upload that last wrote each property: its row's issues plus document-level ones."""
     grouped = defaultdict(list)
     if not property_ids:
         return grouped
-    rows = (
+    current = or_(ValidationIssue.resolution.is_(None), ValidationIssue.resolution != "superseded")
+    row_issues = (
         db.session.query(UploadRow.property_id, ValidationIssue)
         .join(ValidationIssue, ValidationIssue.upload_row_id == UploadRow.id)
         .join(Property, Property.id == UploadRow.property_id)
         .filter(UploadRow.property_id.in_(property_ids), UploadRow.upload_id == Property.upload_id)
-        .filter(ValidationIssue.severity.in_(VISIBLE_SEVERITIES))
-        .filter(or_(ValidationIssue.resolution.is_(None), ValidationIssue.resolution != "superseded"))
+        .filter(ValidationIssue.severity.in_(VISIBLE_SEVERITIES), current)
     )
-    for property_id, item in rows:
+    upload_issues = (
+        db.session.query(Property.id, ValidationIssue)
+        .join(ValidationIssue, ValidationIssue.upload_id == Property.upload_id)
+        .filter(Property.id.in_(property_ids), ValidationIssue.upload_row_id.is_(None))
+        .filter(ValidationIssue.severity.in_(VISIBLE_SEVERITIES), current)
+    )
+    for property_id, item in [*row_issues, *upload_issues]:
         grouped[property_id].append(item)
     return grouped
 
@@ -104,18 +127,21 @@ def portfolio_summary(portfolio_id: str) -> dict | None:
     review = dict(db.session.query(Property.review_status, func.count()).filter_by(portfolio_id=portfolio_id).group_by(Property.review_status).all())
     hazard_missing = Property.query.filter_by(portfolio_id=portfolio_id, hazard_source="missing").count()
     tags = {tag for (tag,) in db.session.query(Property.source_tag).filter_by(portfolio_id=portfolio_id).distinct()}
+    approved = _approved_run(portfolio_id)
+    run_summary = (approved.configuration or {}).get("summary", {}) if approved else {}
+    loss100 = next((item.get("loss_kes") for item in run_summary.get("tierLosses", []) if item.get("rp") == 100), None)
     return {
         "portfolioId": portfolio.id,
         "name": portfolio.name,
-        "status": portfolio.status,
+        "status": "approved" if approved else portfolio.status,
         "totalInsuredValueKes": _num(tiv) or 0.0,
         "propertyCount": count,
         "confirmedCount": review.get("confirmed", 0),
         "unconfirmedCount": review.get("unconfirmed", 0),
         "hazardMissingCount": hazard_missing,
-        "portfolioAalKes": None,
-        "aalPercentTiv": None,
-        "loss100Kes": None,
+        "portfolioAalKes": run_summary.get("aalKes"),
+        "aalPercentTiv": run_summary.get("aalKes") / float(tiv) * 100 if tiv and run_summary.get("aalKes") else None,
+        "loss100Kes": loss100,
         "highRiskValueKes": None,
         "highRiskValueShare": None,
         "aiFlaggedCount": None,
@@ -173,8 +199,12 @@ def list_properties(portfolio_id: str, filters: dict) -> dict | None:
     limit = min(max(int(filters.get("limit") or 50), 1), MAX_LIMIT)
     page = query.offset(offset).limit(limit).all()
     issues = _issues_for([prop.id for prop in page])
+    approved = _approved_run(portfolio_id)
+    ids = [prop.id for prop in page]
+    hazards = {item.property_id: item for item in HazardResult.query.filter(HazardResult.model_run_id == approved.id, HazardResult.property_id.in_(ids)).all()} if approved and ids else {}
+    losses = {item.property_id: item for item in LossResult.query.filter(LossResult.model_run_id == approved.id, LossResult.property_id.in_(ids)).all()} if approved and ids else {}
     return {
-        "items": [property_item(prop, len(issues[prop.id])) for prop in page],
+        "items": [property_item(prop, len(issues[prop.id]), hazards.get(prop.id), losses.get(prop.id)) for prop in page],
         "total": total,
         "nextCursor": str(offset + limit) if offset + limit < total else None,
         "dummy": False,
@@ -218,14 +248,17 @@ def property_detail(property_id: str) -> dict | None:
         methods.update(method for (method,) in db.session.query(FieldProvenance.method).filter_by(subject_type="upload_row", subject_id=latest_row.id, superseded_by=None))
     else:
         methods.update(method for (method,) in db.session.query(FieldProvenance.method).filter_by(subject_type="property", subject_id=prop.id))
-    item = property_item(prop, len(issues))
+    approved = _approved_run(prop.portfolio_id)
+    hazard_result = HazardResult.query.filter_by(property_id=prop.id, model_run_id=approved.id).first() if approved else None
+    loss_result = LossResult.query.filter_by(property_id=prop.id, model_run_id=approved.id).first() if approved else None
+    item = property_item(prop, len(issues), hazard_result, loss_result)
     return {
         "identity": {key: item[key] for key in ("id", "portfolioId", "name", "region", "latitude", "longitude", "housingClass", "sourceTag", "reviewStatus", "geocodePrecision")} | {"address": (prop.attributes or {}).get("address"), "geocode": (prop.attributes or {}).get("geocode")},
         "exposure": {"floorAreaM2": item["floorAreaM2"], "costPerM2Kes": item["costPerM2Kes"], "insuredValueKes": item["insuredValueKes"], "sourceTag": prop.source_tag, "extra": (prop.attributes or {}).get("extra", {})},
         "hazard": {
-            "score": None,
-            "band": PENDING,
-            "annualFloodProbability": None,
+            "score": item["hazardScore"],
+            "band": item["hazardBand"],
+            "annualFloodProbability": item["annualFloodProbability"],
             "tiers": tiers,
             "drivers": None,
             "nearestHotspot": (prop.attributes or {}).get("nearby_hotspots", [None])[0] if (prop.attributes or {}).get("nearby_hotspots") else None,
@@ -237,18 +270,18 @@ def property_detail(property_id: str) -> dict | None:
             "depthAssumption": {"dMaxM": fm.DEFAULT_D_MAX, "method": "score × d_max"},
         },
         "loss": {
-            "aalKes": None,
-            "aalPerMilleTiv": None,
-            "loss10Kes": None,
-            "loss100Kes": None,
-            "loss250Kes": None,
+            "aalKes": item["aalKes"],
+            "aalPerMilleTiv": item["aalKes"] / item["insuredValueKes"] * 1000 if item["aalKes"] is not None and item["insuredValueKes"] else None,
+            "loss10Kes": _num(loss_result.loss_10_kes) if loss_result else None,
+            "loss100Kes": item["loss100Kes"],
+            "loss250Kes": item["loss250Kes"],
             "portfolioLoss100Share": None,
-            "epCurve": [],
-            "sourceTag": "pending_model_run",
+            "epCurve": loss_result.ep_curve if loss_result else [],
+            "sourceTag": "modelled" if loss_result else "pending_model_run",
         },
         "explainability": {
             "summary": "Exposure and proxy hazard scores are loaded. Loss and flood probability appear after an approved model run.",
-            "warnings": [{"code": issue.code, "severity": issue.severity, "message": issue.message} for issue in issues],
+            "warnings": [{"code": issue.code, "severity": issue.severity, "message": issue.message, "scope": "row" if issue.upload_row_id else "document", "evidence": issue.evidence} for issue in issues],
             "provenance": [{"method": method, "fields": count} for method, count in sorted(methods.items())],
         },
         "portfolioContext": _portfolio_context(prop),
@@ -334,3 +367,43 @@ def create_property(portfolio_id: str, payload: dict) -> dict:
         ))
     db.session.commit()
     return property_item(prop) | {"issues": issues}
+
+
+SNIPPET_CHARS = 240
+
+
+def _snippet(text: str, terms: list[str]) -> str:
+    lowered = text.lower()
+    positions = [lowered.find(term.lower()) for term in terms if lowered.find(term.lower()) >= 0]
+    start = max(min(positions) - SNIPPET_CHARS // 3, 0) if positions else 0
+    snippet = text[start:start + SNIPPET_CHARS].strip()
+    return ("…" if start else "") + snippet + ("…" if start + SNIPPET_CHARS < len(text) else "")
+
+
+def search_documents(portfolio_id: str, text: str, limit: int = 10) -> dict:
+    """Full-text search over document chunks (Postgres FTS; substring match on other databases)."""
+    text = (text or "").strip()
+    terms = [term for term in re.findall(r"\w+", text) if len(term) > 1]
+    if not terms:
+        raise RepositoryError("q must contain at least one word.")
+    query = (
+        db.session.query(DocumentChunk, Upload.filename)
+        .join(Upload, Upload.id == DocumentChunk.upload_id)
+        .filter(DocumentChunk.portfolio_id == portfolio_id)
+    )
+    if db.engine.dialect.name == "postgresql":
+        vector = func.to_tsvector("english", DocumentChunk.text)
+        search = func.websearch_to_tsquery("english", text)
+        query = query.filter(vector.op("@@")(search)).order_by(func.ts_rank(vector, search).desc())
+    else:
+        for term in terms:
+            query = query.filter(DocumentChunk.text.ilike(f"%{term}%"))
+        query = query.order_by(DocumentChunk.upload_id, DocumentChunk.chunk_index)
+    results = query.limit(min(max(limit, 1), 50)).all()
+    return {
+        "items": [
+            {"uploadId": chunk.upload_id, "filename": filename, "page": chunk.page, "chunkIndex": chunk.chunk_index, "snippet": _snippet(chunk.text, terms), "text": chunk.text}
+            for chunk, filename in results
+        ],
+        "total": len(results),
+    }

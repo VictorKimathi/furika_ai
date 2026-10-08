@@ -1,6 +1,6 @@
 # Ingestion, validation and data-store plan
 
-Status: Phases 0, 1 and 2 implemented 2026-10-08 (see the notes for each below). Phases 3–5 not started.
+Status: Phases 0–3 implemented 2026-10-08 (see the notes for each below), plus the Data Sources screen from Phase 5. Phases 4 and 5 (rest) not started.
 
 ## Goal
 
@@ -187,6 +187,43 @@ Phases 0 to 2 need no AI key. With a fake LLM they're fully deterministic, so th
 ## Out of scope for now
 
 OCR of scanned PDFs, elevation and DEM checks, an RCC / basement vulnerability class (rows are flagged, not modelled), access control beyond the current dummy auth, background workers, and object storage.
+
+## Phase 4 notes (chat, workflow, map)
+
+- **Chat** (`app/services/chat.py`, `chat_provider.py`):
+  - Answers from database evidence: a portfolio overview (by class, review status and hazard source; highest TIV and highest hazard properties; approved AAL when a run is approved), the selected uploads' rows, chunks and facts (or the three most recent parsed uploads when none are attached), plus named properties and hotspots.
+  - Providers: Gemini first, then Claude through the shared `llm.ClaudeService` (`claude-opus-5-5`, refusal fallbacks). `CLAUDE_CODE` is accepted as an alias for `ANTHROPIC_API_KEY`.
+  - When both providers fail, it returns a data-only summary and says why, instead of a 503.
+- **Workflow:** `/model-runs` runs `furika_model.run_model` on confirmed properties with all five scores, stops at `review`, and on approval writes `HazardResult`/`LossResult` per property.
+- **Map:** properties from `/portfolios/{id}/properties`, hotspots from `/locations/hotspots`.
+- **Tables printed to PDF** (`pdf_tables.py`):
+  - The column layout comes from standard header names, with no AI; Claude reads the first lines only when the names are non-standard.
+  - The server builds the row pattern from fixed sub-patterns and parses every line deterministically. Lines that don't match are reported as `unparsed_line`.
+  - `POST /uploads/{id}/reprocess` rebuilds an upload's derived records, for example after adding the key or credit.
+
+## Phase 3 notes
+
+Built in `app/services/llm.py` (Claude client), `app/services/ingestion/documents.py`, the document branch of `pipeline.py`, new endpoints in `app/api/uploads.py` / `portfolios.py`, and the Data Sources screen in `furika_vote/src/main.jsx` (+ `src/api.js`). Tests are in `tests/test_documents.py`.
+
+- **Parsing moved from Gemini to Claude.** Column mapping and document extraction use `claude-opus-5-5` through the Anthropic SDK with structured outputs (`output_config.format` with a JSON schema; the mapping schema restricts `field` and `column` to the real candidates) and server-side refusal fallbacks (`fallbacks: "default"`). Key: `ANTHROPIC_API_KEY` in `backend/.env`; optional `CLAUDE_MODEL`. `run.py`/`wsgi.py` now load `.env`. Gemini remains only behind the placeholder chat routes.
+- **Accepted files:** any type. CSV/XLSX → table pipeline; PDF/DOCX/TXT/MD → document pipeline; everything else is stored and hashed with status `stored`. Known types must still match their leading bytes.
+- **Background processing:** documents run in a background thread (`INGESTION_ASYNC`, off in tests), so the upload returns `queued` and the client polls `/uploads/{id}`. Statuses: `queued → extracting → validating → done | rejected | extraction_failed | failed`.
+- **Text and search:** pypdf (per page), python-docx (paragraphs and tables in order; one "page"), and plain text (pages split on form feeds). Text is chunked (~1,500 chars) into `document_chunks`. `GET /portfolios/{id}/documents/search?q=` uses Postgres full-text search (substring match on SQLite) and returns file, page and snippet. Documents are indexed even without a Claude key (`ai_unavailable` warning).
+- **Extraction:** PDFs go to Claude as base64 `document` blocks; DOCX and text go as page-marked text. Claude returns buildings (canonical fields), facts (`fact` / `term` / `claim` / `opinion`, so a broker's "ACCEPT" is stored as an opinion, not a finding) and findings, each with a quote, page and confidence.
+- **Quote check:** every quote must appear (after NFKC, case and punctuation normalisation) in the document's own text. The page is corrected when the quote is on a different page; unmatched values, facts and findings are dropped with `ai_quote_not_found` (info). Numeric values must also appear in their quote (`value_not_in_quote`, warning). Scanned PDFs (no text layer) raise `no_text_layer`, and their values get `quote_unverified` (review).
+- **Buildings:** extracted buildings go through `evaluate_row` like spreadsheet rows (geocoding, hazard lookup, `unsupported_construction` for RCC, …) with `method=ai_extracted`. They are never auto-confirmed, so they land in the review queue. A missing location ID is generated as `DOC-<upload>-<n>`.
+- **Document checks:**
+  - Deterministic: `area_breakdown_mismatch` (component areas vs stated gross; this replaces the AI's version of the same finding), `offer_expiring` (≤ 14 days or past), and `distance_claim_mismatch` (geocodes the named place, compares with the building; needs the geocoder).
+  - AI-flagged, quote-backed warnings: `internal_contradiction`, `unit_inconsistency`, `missing_valuation_basis`, `ambiguous_term`, `unsigned_declaration`, `loss_history_gap`, `elevation_claim_implausible`.
+  - Document-level issues appear on every property that document promoted (`scope: "document"` in property detail warnings).
+- **New endpoints:** `GET /uploads/{id}/facts`, `DELETE /uploads/{id}` (reverts or removes the properties it last wrote, then deletes rows, issues, facts, chunks and the stored file; 409 while processing) and the document search above.
+- **Data Sources UI:**
+  - Lists uploads from the backend and polls while any are processing. Accepts any file by drag-and-drop or browse.
+  - Requires choosing *Synthetic data* or *Redacted documents*; the choice is sent as `attestation` and remembered in the browser.
+  - Shows status tones, a per-row summary, and expandable details (checks with quotes and pages, extracted facts, a link to the original). Delete has an inline confirm.
+  - Chat attachments still use the text of text-like files cached in the browser until Phase 4.
+- **Schema changes:** new tables `document_chunks` and `document_facts`. Recreate the local database (`init-db` on an empty database).
+- **Not done:** OCR beyond what Claude reads from a scanned PDF (those values always need review), `.doc`/`.xls` (stored only), and a live run against the Claude API. The request shape was checked against the SDK, but extraction quality on real documents still needs testing once the key is set.
 
 ## Phase 2 notes
 
