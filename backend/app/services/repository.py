@@ -55,10 +55,44 @@ def _approved_run(portfolio_id: str) -> ModelRun | None:
     return run
 
 
-def _risk_band(score: float | None) -> str:
-    if score is None:
+def _modellable(prop: Property) -> str | None:
+    """Why this property can't be modelled, or None if it can."""
+    if prop.review_status != "confirmed":
+        return "It is unconfirmed: confirm it in the review queue first."
+    if prop.housing_class not in fm.VALID_CLASSES:
+        return f"Its construction class '{prop.housing_class}' has no vulnerability curve in the model."
+    scores = _hazard_scores(prop) or {}
+    if not all(tier in scores for tier in fm.TIERS):
+        return "It has no hazard scores yet (no supplied scores and no reference grid nearby)."
+    if not (prop.insured_value_kes and prop.floor_area_m2 and prop.cost_per_m2_kes):
+        return "Its floor area, cost per m² or insured value is missing."
+    return None
+
+
+def model_status(prop: Property, approved: ModelRun | None, draft: ModelRun | None, has_approved_result: bool, has_draft_result: bool) -> dict:
+    """Which results the property shows and whether a new run can be started from it."""
+    if has_approved_result:
+        return {"state": "approved", "runId": approved.id, "canRun": False, "reason": None}
+    if has_draft_result:
+        return {"state": "draft", "runId": draft.id, "canRun": False, "reason": f"Draft results from run {draft.id}, awaiting approval."}
+    reason = _modellable(prop)
+    if reason:
+        return {"state": "not_modellable", "runId": None, "canRun": False, "reason": reason}
+    latest = ModelRun.query.filter_by(portfolio_id=prop.portfolio_id, status="approved").order_by(ModelRun.completed_at.desc()).first()
+    if latest is not None and approved is None:
+        return {"state": "stale", "runId": latest.id, "canRun": True, "reason": f"Portfolio data changed after run {latest.id} was approved, so its results are no longer shown. Run the model again."}
+    if approved is not None:
+        return {"state": "not_in_run", "runId": approved.id, "canRun": True, "reason": f"This property was added or changed after run {approved.id}. Run the model to include it."}
+    return {"state": "no_run", "runId": None, "canRun": True, "reason": "No model run has been calculated for this portfolio yet."}
+
+
+def _risk_band(probability: float | None, modelled: bool = True) -> str:
+    """Risk band from the modelled annual flood probability (1/RP of the most frequent tier that floods)."""
+    if not modelled:
         return PENDING
-    return "extreme" if score >= .8 else "severe" if score >= .6 else "moderate" if score >= .4 else "occasional" if score >= .2 else "common"
+    if probability is None or probability <= 0:
+        return "low"
+    return "severe" if probability >= 0.1 else "high" if probability >= 0.04 else "moderate" if probability >= 0.01 else "low"
 
 
 def property_item(prop: Property, issue_count: int = 0, hazard: HazardResult | None = None, loss: LossResult | None = None) -> dict:
@@ -74,7 +108,7 @@ def property_item(prop: Property, issue_count: int = 0, hazard: HazardResult | N
         "costPerM2Kes": _num(prop.cost_per_m2_kes),
         "insuredValueKes": _num(prop.insured_value_kes),
         "hazardScore": _num(hazard.hazard_score) if hazard else None,
-        "hazardBand": _risk_band(_num(hazard.hazard_score)) if hazard else PENDING,
+        "hazardBand": _risk_band(_num(hazard.annual_flood_probability), modelled=True) if hazard else PENDING,
         "annualFloodProbability": _num(hazard.annual_flood_probability) if hazard else None,
         "aalKes": _num(loss.aal_kes) if loss else None,
         "loss100Kes": _num(loss.loss_100_kes) if loss else None,
@@ -169,16 +203,29 @@ def list_properties(portfolio_id: str, filters: dict) -> dict | None:
         query = query.filter(or_(Property.id.ilike(pattern), Property.name.ilike(pattern), Property.region.ilike(pattern)))
     if filters.get("housingClass"):
         query = query.filter(Property.housing_class == filters["housingClass"])
+    approved = _approved_run(portfolio_id)
+    in_run = db.session.query(HazardResult.property_id).filter(HazardResult.model_run_id == approved.id) if approved else None
     if filters.get("hazardBand"):
         bands = {band.strip().lower() for band in filters["hazardBand"].split(",")}
-        if PENDING not in bands:
-            query = query.filter(false())  # no property has a modelled band yet
+        if approved is None:
+            if PENDING not in bands:
+                query = query.filter(false())  # no approved results yet
+        else:
+            probability = HazardResult.annual_flood_probability
+            ranges = {"severe": probability >= 0.1, "high": (probability >= 0.04) & (probability < 0.1),
+                      "moderate": (probability >= 0.01) & (probability < 0.04), "low": or_(probability.is_(None), probability < 0.01)}
+            conditions = [Property.id.in_(in_run.filter(ranges[band])) for band in bands if band in ranges]
+            if PENDING in bands:
+                conditions.append(Property.id.notin_(in_run))
+            query = query.filter(or_(*conditions)) if conditions else query.filter(false())
     if filters.get("minTiv") is not None:
         query = query.filter(Property.insured_value_kes >= filters["minTiv"])
     if filters.get("maxTiv") is not None:
         query = query.filter(Property.insured_value_kes <= filters["maxTiv"])
-    if filters.get("minProbability") is not None or str(filters.get("aiFlagged", "")).lower() == "true":
-        query = query.filter(false())  # requires model results
+    if filters.get("minProbability") is not None:
+        query = query.filter(Property.id.in_(in_run.filter(HazardResult.annual_flood_probability >= filters["minProbability"]))) if approved else query.filter(false())
+    if str(filters.get("aiFlagged", "")).lower() == "true":
+        query = query.filter(false())  # no AI uplift is applied yet
     if filters.get("nearHotspotKm") is not None:
         if Hotspot.query.count() == 0:
             raise RepositoryError("nearHotspotKm needs hotspot reference data, which is not loaded yet.")
@@ -211,21 +258,51 @@ def list_properties(portfolio_id: str, filters: dict) -> dict | None:
     }
 
 
-def _portfolio_context(prop: Property) -> dict:
+def _aal_rank(prop: Property, run, loss_result) -> tuple[str | None, float | None]:
+    """Rank label by AAL within the approved run, and this property's share of the portfolio 1-in-100 loss."""
+    if run is None or loss_result is None:
+        return None, None
+    aal = float(loss_result.aal_kes or 0)
+    count = LossResult.query.filter_by(model_run_id=run.id).count()
+    higher = LossResult.query.filter(LossResult.model_run_id == run.id, LossResult.aal_kes > aal).count()
+    total_100 = db.session.query(func.sum(LossResult.loss_100_kes)).filter(LossResult.model_run_id == run.id).scalar()
+    share = float(loss_result.loss_100_kes or 0) / float(total_100) if total_100 else None
+    if aal <= 0:
+        return f"No AAL (of {count})", share
+    percent = (higher + 1) / count * 100
+    return (f"Top {max(percent, 1):.0f}%" if percent <= 50 else f"Bottom {max(100 - percent, 1):.0f}%") + f" · #{higher + 1} of {count}", share
+
+
+def _summary(prop: Property, hazard_result, loss_result, tiers: list[dict]) -> str:
+    if loss_result is None:
+        return "Exposure and proxy hazard scores are loaded. Losses and flood probability appear once a model run that includes this property is approved."
+    probability = _num(hazard_result.annual_flood_probability) if hazard_result else None
+    tiv = _num(prop.insured_value_kes) or 0
+    first_wet = next((tier for tier in tiers if tier["depthM"] > 0), None)
+    if not probability or first_wet is None:
+        return f"None of the five flood scenarios reaches this property in the approved run, so its modelled loss is zero."
+    loss100 = _num(loss_result.loss_100_kes) or 0
+    return (f"Floodwater first reaches this property in the {first_wet['name']} scenario (about 1 in {first_wet['returnPeriodYears']} years, "
+            f"so roughly a {probability:.0%} chance each year), at a proxy depth of {first_wet['depthM']:.2f} m. "
+            f"In a 1-in-100 flood it could lose about {loss100 / tiv:.0%} of its insured value (KES {loss100 / 1e6:,.1f}M). "
+            f"Its long-run average yearly flood cost is KES {(_num(loss_result.aal_kes) or 0) / 1e6:,.2f}M.")
+
+
+def _portfolio_context(prop: Property, rank: str | None = None) -> dict:
     rows = db.session.query(Property.latitude, Property.longitude, Property.insured_value_kes).filter(Property.portfolio_id == prop.portfolio_id).all()
     lat = np.array([float(row[0]) for row in rows])
     lon = np.array([float(row[1]) for row in rows])
     tiv = np.array([float(row[2] or 0) for row in rows])
     near = fm.haversine_km(lat, lon, float(prop.latitude), float(prop.longitude)) <= LOCAL_RADIUS_KM
     return {
-        "aalRank": None,
+        "aalRank": rank,
         "cluster": prop.region,
         "propertiesWithin500m": int(near.sum()) - 1,
         "localInsuredValueKes": float(tiv[near].sum()),
     }
 
 
-def property_detail(property_id: str) -> dict | None:
+def property_detail(property_id: str, include_draft: bool = False) -> dict | None:
     prop = db.session.get(Property, property_id)
     if prop is None:
         return None
@@ -251,7 +328,16 @@ def property_detail(property_id: str) -> dict | None:
     approved = _approved_run(prop.portfolio_id)
     hazard_result = HazardResult.query.filter_by(property_id=prop.id, model_run_id=approved.id).first() if approved else None
     loss_result = LossResult.query.filter_by(property_id=prop.id, model_run_id=approved.id).first() if approved else None
+    has_approved = loss_result is not None
+    draft = None
+    if not has_approved and include_draft:
+        draft = ModelRun.query.filter_by(portfolio_id=prop.portfolio_id, status="review").order_by(ModelRun.created_at.desc()).first()
+        if draft is not None:
+            hazard_result = HazardResult.query.filter_by(property_id=prop.id, model_run_id=draft.id).first()
+            loss_result = LossResult.query.filter_by(property_id=prop.id, model_run_id=draft.id).first()
+    status = model_status(prop, approved, draft, has_approved, not has_approved and loss_result is not None)
     item = property_item(prop, len(issues), hazard_result, loss_result)
+    rank, share = _aal_rank(prop, approved if has_approved else draft, loss_result)
     return {
         "identity": {key: item[key] for key in ("id", "portfolioId", "name", "region", "latitude", "longitude", "housingClass", "sourceTag", "reviewStatus", "geocodePrecision")} | {"address": (prop.attributes or {}).get("address"), "geocode": (prop.attributes or {}).get("geocode")},
         "exposure": {"floorAreaM2": item["floorAreaM2"], "costPerM2Kes": item["costPerM2Kes"], "insuredValueKes": item["insuredValueKes"], "sourceTag": prop.source_tag, "extra": (prop.attributes or {}).get("extra", {})},
@@ -275,16 +361,17 @@ def property_detail(property_id: str) -> dict | None:
             "loss10Kes": _num(loss_result.loss_10_kes) if loss_result else None,
             "loss100Kes": item["loss100Kes"],
             "loss250Kes": item["loss250Kes"],
-            "portfolioLoss100Share": None,
+            "portfolioLoss100Share": share,
             "epCurve": loss_result.ep_curve if loss_result else [],
-            "sourceTag": "modelled" if loss_result else "pending_model_run",
+            "sourceTag": ("modelled" if has_approved else "draft") if loss_result else "pending_model_run",
         },
         "explainability": {
-            "summary": "Exposure and proxy hazard scores are loaded. Loss and flood probability appear after an approved model run.",
+            "summary": _summary(prop, hazard_result, loss_result, tiers),
             "warnings": [{"code": issue.code, "severity": issue.severity, "message": issue.message, "scope": "row" if issue.upload_row_id else "document", "evidence": issue.evidence} for issue in issues],
             "provenance": [{"method": method, "fields": count} for method, count in sorted(methods.items())],
         },
-        "portfolioContext": _portfolio_context(prop),
+        "portfolioContext": _portfolio_context(prop, rank),
+        "modelStatus": status,
         "dummy": False,
     }
 
@@ -296,22 +383,34 @@ def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
         raise RepositoryError(f"type must be one of {', '.join(CLUSTER_TYPES)}.")
     props = Property.query.filter_by(portfolio_id=portfolio_id).all()
     total_tiv = sum(_num(prop.insured_value_kes) or 0 for prop in props)
+    approved = _approved_run(portfolio_id)
+    losses = {item.property_id: item for item in LossResult.query.filter_by(model_run_id=approved.id)} if approved else {}
+    hazards = {item.property_id: item for item in HazardResult.query.filter_by(model_run_id=approved.id)} if approved else {}
+    portfolio_l100 = sum(_num(item.loss_100_kes) or 0 for item in losses.values())
     groups: dict[str, list[Property]] = defaultdict(list)
+    if cluster_type == "neighbourhood" and not any(prop.region for prop in props):
+        cluster_type = "grid"  # no regions in the data: neighbourhoods fall back to ~5.5 km grid cells
     for prop in props:
         if cluster_type == "neighbourhood":
             key = prop.region or "Unassigned"
         elif cluster_type == "housing_class":
             key = prop.housing_class or "Unassigned"
-        elif cluster_type == "grid":
-            key = f"{float(prop.latitude):.2f}, {float(prop.longitude):.2f}"
+        elif cluster_type == "grid":  # ~5.5 km cells
+            key = f"Grid {round(float(prop.latitude) / 0.05) * 0.05:.2f}, {round(float(prop.longitude) / 0.05) * 0.05:.2f}"
         else:
-            key = PENDING
+            hazard = hazards.get(prop.id)
+            key = _risk_band(_num(hazard.annual_flood_probability)) if hazard else PENDING
         groups[key].append(prop)
 
     items = []
     for name, members in groups.items():
         tiv = sum(_num(prop.insured_value_kes) or 0 for prop in members)
         classes = Counter(CLASS_MIX_KEYS.get(prop.housing_class, "other") for prop in members)
+        modelled = [prop for prop in members if prop.id in losses]
+        l100 = sum(_num(losses[prop.id].loss_100_kes) or 0 for prop in modelled) if modelled else None
+        aal = sum(_num(losses[prop.id].aal_kes) or 0 for prop in modelled) if modelled else None
+        probabilities = [_num(hazards[prop.id].annual_flood_probability) or 0 for prop in modelled if prop.id in hazards]
+        mean_probability = sum(probabilities) / len(probabilities) if probabilities else None
         items.append({
             "id": "CLU-" + re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-").upper(),
             "portfolioId": portfolio_id,
@@ -320,16 +419,16 @@ def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
             "propertyCount": len(members),
             "insuredValueKes": tiv,
             "tivShare": tiv / total_tiv if total_tiv else None,
-            "loss100Kes": None,
-            "aalPercentTiv": None,
-            "annualFloodProbability": None,
-            "portfolioLossShare": None,
-            "riskBand": PENDING,
+            "loss100Kes": l100,
+            "aalPercentTiv": aal / tiv * 100 if aal is not None and tiv else None,
+            "annualFloodProbability": mean_probability,
+            "portfolioLossShare": l100 / portfolio_l100 if l100 is not None and portfolio_l100 else None,
+            "riskBand": _risk_band(mean_probability) if modelled else PENDING,
             "classMix": {key: value / len(members) for key, value in classes.items()},
             "hotspotFlag": None,
             "accumulationFlag": None,
         })
-    items.sort(key=lambda item: item["insuredValueKes"], reverse=True)
+    items.sort(key=lambda item: (item["loss100Kes"] or 0, item["insuredValueKes"]), reverse=True)
     return {"items": items, "total": len(items), "dummy": False}
 
 

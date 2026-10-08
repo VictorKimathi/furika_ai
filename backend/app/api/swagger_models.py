@@ -106,6 +106,7 @@ property_detail_model = api.model("PropertyDetail", {
     "loss": fields.Raw(description="AAL, return-period losses, damage ratios, and EP curve."),
     "explainability": fields.Raw(description="Plain-language summary, warnings, and provenance."),
     "portfolioContext": fields.Raw(description="Rank, cluster, nearby property count, and local TIV."),
+    "modelStatus": fields.Raw(description="{state: approved|draft|stale|not_in_run|no_run|not_modellable, runId, canRun, reason}"),
     "dummy": fields.Boolean,
 })
 

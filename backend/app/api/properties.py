@@ -1,3 +1,4 @@
+from flask import request
 from flask_restx import Namespace, Resource
 
 from ..extensions import db
@@ -14,9 +15,10 @@ ns = Namespace("properties", description="Complete property hazard, loss, and ex
 class PropertyDetailResource(Resource):
     @ns.marshal_with(property_detail_model)
     @ns.response(404, "Property not found", error_model)
+    @ns.doc(params={"includeDraft": "true to show results from a run awaiting approval when no approved results exist"})
     def get(self, property_id):
-        """Return exposure, five-tier hazard, EP loss, provenance, and portfolio context."""
-        result = repository.property_detail(property_id)
+        """Return exposure, five-tier hazard, EP loss, provenance, portfolio context and model status."""
+        result = repository.property_detail(property_id, include_draft=request.args.get("includeDraft") == "true")
         if result is None:
             ns.abort(404, f"Property {property_id} was not found.")
         return result

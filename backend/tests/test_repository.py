@@ -106,3 +106,49 @@ def test_seed_reports_missing_file(app):
     result = app.test_cli_runner().invoke(args=["seed-reference", "--file", "nope.csv"])
     assert result.exit_code != 0
     assert "not found" in result.output
+
+
+def test_bands_rank_and_summary_after_approval(seeded):
+    run = seeded.post(f"{BASE.replace('/portfolios/SYN-PORT-142', '')}/model-runs", json={"portfolioId": "SYN-PORT-142"}).json
+    seeded.post(f"/api/v1/model-runs/{run['id']}/decision", json={"action": "approve"})
+    items = {item["id"]: item for item in seeded.get(f"{BASE}/properties?limit=50").json["items"]}
+    assert all(item["hazardBand"] in ("low", "moderate", "high", "severe") for item in items.values())
+    severe = seeded.get(f"{BASE}/properties?hazardBand=severe").json["items"]
+    assert all(item["hazardBand"] == "severe" for item in severe) and severe
+    detail = seeded.get("/api/v1/properties/NBO-0002").json
+    assert detail["portfolioContext"]["aalRank"].startswith(("Top", "Bottom"))
+    assert 0 < detail["loss"]["portfolioLoss100Share"] <= 1
+    assert "Floodwater first reaches this property" in detail["explainability"]["summary"]
+
+
+def test_model_status_drives_the_run_button(seeded):
+    detail = seeded.get("/api/v1/properties/NBO-0002?includeDraft=true").json
+    assert detail["modelStatus"]["state"] == "no_run" and detail["modelStatus"]["canRun"] is True
+    assert detail["hazard"]["annualFloodProbability"] is None
+
+    run = seeded.post("/api/v1/model-runs", json={"portfolioId": "SYN-PORT-142"}).json
+    draft = seeded.get("/api/v1/properties/NBO-0002?includeDraft=true").json
+    assert draft["modelStatus"] == {"state": "draft", "runId": run["id"], "canRun": False, "reason": f"Draft results from run {run['id']}, awaiting approval."}
+    assert draft["loss"]["sourceTag"] == "draft" and draft["loss"]["aalKes"] is not None
+    assert seeded.get("/api/v1/properties/NBO-0002").json["loss"]["aalKes"] is None  # drafts only when asked for
+
+    seeded.post(f"/api/v1/model-runs/{run['id']}/decision", json={"action": "approve"})
+    approved = seeded.get("/api/v1/properties/NBO-0002?includeDraft=true").json
+    assert approved["modelStatus"]["state"] == "approved" and approved["loss"]["sourceTag"] == "modelled"
+
+    seeded.post(f"{BASE}/properties", json={"name": "Later", "latitude": -1.2585, "longitude": 36.8556, "housingClass": "semi_permanent", "floorAreaM2": 40, "costPerM2Kes": 10000})
+    stale = seeded.get("/api/v1/properties/NBO-0002?includeDraft=true").json
+    assert stale["modelStatus"]["state"] == "stale" and stale["modelStatus"]["canRun"] is True
+
+
+def test_unmodellable_property_has_no_run_button(seeded):
+    import io
+    content = "loc_id,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes\nLC-1,-1.2585,36.8556,semi_permanent,40,10000\n"
+    from app.extensions import db
+    from app.models import Property
+    seeded.post(f"{BASE}/uploads", data={"file": (io.BytesIO(content.encode()), "x.csv"), "attestation": "synthetic"}, content_type="multipart/form-data")
+    prop = db.session.get(Property, "LC-1")
+    prop.review_status = "unconfirmed"
+    db.session.commit()
+    status = seeded.get("/api/v1/properties/LC-1?includeDraft=true").json["modelStatus"]
+    assert status["state"] == "not_modellable" and status["canRun"] is False and "unconfirmed" in status["reason"]
