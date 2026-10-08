@@ -92,6 +92,8 @@ const MODEL_FACTS = {
   hotspotsTotal: 24,
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+
 let mapsPromise;
 function loadGoogleMaps(apiKey) {
   if (window.google?.maps) return Promise.resolve(window.google.maps);
@@ -287,13 +289,13 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
     if (/\b(add|create|include|model)\b/i.test(text) && /\b(property|warehouse|building|apartment|asset|portfolio)\b/i.test(text)) {
       let parsed = parseProperty(text);
       try {
-        const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'exposure' }) });
+        const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'exposure' }) });
         if (response.ok) { const data = await response.json(); if (data.asset) parsed = { ...parsed, ...data.asset, id: parsed.id }; }
       } catch { /* deterministic preview remains available */ }
       await completeThinking(); setPreview(parsed); return;
     }
     try {
-      const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis' }) });
+      const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis' }) });
       if (!response.ok) throw new Error('AI unavailable');
       const data = await response.json();
       await completeThinking();

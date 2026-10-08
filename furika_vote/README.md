@@ -24,6 +24,7 @@ Add both keys to `.env`:
 
 ```env
 VITE_GOOGLE_MAPS_API_KEY=your_browser_restricted_google_maps_key
+VITE_API_BASE_URL=http://localhost:5000/api/v1
 OPENAI_API_KEY=your_server_side_openai_key
 OPENAI_MODEL=gpt-5-mini
 ```
