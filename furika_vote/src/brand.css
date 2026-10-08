@@ -18,7 +18,6 @@
   .tool-rail,.tool-rail.expanded{position:fixed;top:10px;bottom:10px;left:10px;width:88px;height:auto;padding:10px 8px;display:flex;flex-direction:column;background:var(--brand-navy);border:0;border-radius:16px;box-shadow:0 8px 24px rgba(4,29,59,.22);overflow:hidden auto}
   .tool-rail .rail-toggle{display:none}
   .rail-items{flex:1;justify-content:flex-start;gap:6px;padding-top:0}
-  .rail-items button:nth-last-child(2){margin-top:auto}
   .tool-rail button{position:relative;width:100%;height:auto;min-height:66px;padding:10px 4px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:12px;color:rgba(255,255,255,.72);background:transparent;white-space:normal;text-align:center;transition:background-color .15s ease,color .15s ease}
   .tool-rail button>svg{width:22px;height:22px}
   .tool-rail button strong,.tool-rail.expanded button strong{display:block;color:inherit;font-size:10.5px!important;font-weight:600;line-height:1.2}
@@ -28,3 +27,53 @@
 }
 .tool-rail button:focus-visible{outline:2px solid var(--brand-red);outline-offset:-2px}
 .login-submit:focus-visible,.data-sources-header>button:focus-visible{outline:2px solid var(--brand-red);outline-offset:2px}
+
+/* Navy top bar with the Kenya Re logo on a white badge */
+.app-header,.app-header.minimal{background:linear-gradient(90deg,#041d3b 0%,#0b2d57 100%);border-bottom:0;box-shadow:inset 0 -2px 0 var(--brand-red)}
+.app-header .brand-logo{height:46px;padding:3px 10px;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.app-header .brand strong{color:#fff}
+.app-header .brand span{color:#b9c7d8}
+.app-header .header-actions button,.app-header .profile-button{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+.app-header .header-actions button:hover{background:rgba(255,255,255,.16)}
+.app-header .profile-button span{color:#fff}
+.app-header .header-avatar{color:#041d3b!important;background:#fff!important}
+.login-logo{height:72px;padding:4px 12px;background:#fff}
+
+/* Furika Bot mascot */
+.furika-mascot{display:block;flex:0 0 auto;overflow:visible}
+.furika-mascot.animated .mascot-body{animation:furi-bob 3.2s ease-in-out infinite;transform-origin:32px 40px}
+.furika-mascot .mascot-eyes{animation:furi-blink 5.5s infinite;transform-origin:32px 38px;transform-box:view-box}
+@keyframes furi-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes furi-blink{0%,93%,100%{transform:scaleY(1)}95%{transform:scaleY(.12)}}
+@media(prefers-reduced-motion:reduce){.furika-mascot .mascot-body,.furika-mascot .mascot-eyes{animation:none}}
+.panel-title>.bot-avatar{width:auto;height:auto;background:transparent;border-radius:0}
+.bot-meta{display:inline-flex;align-items:center;gap:5px;color:#041d3b;font-weight:700}
+.tool-rail button.rail-bot .furika-mascot{filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
+.tool-rail button.rail-bot.active .furika-mascot path:first-child{stroke:#fff;stroke-width:1.5}
+
+/* Chat input: blue, lifted 10px off the bottom of the screen */
+.chat-composer{padding-bottom:20px!important}
+.chat-composer textarea{height:58px;padding:10px 12px;color:#041d3b;background:#e8f0fb;border:1.5px solid #9ec5f4;border-radius:12px;font-size:12px;line-height:1.5;transition:border-color .15s ease,box-shadow .15s ease}
+.chat-composer textarea::placeholder{color:#5b7aa6}
+.chat-composer textarea:focus{background:#f2f7fd;border-color:#2a78d6;box-shadow:0 0 0 3px rgba(42,120,214,.18)}
+.chat-composer .analyse-button{height:32px;padding:0 14px;border-radius:8px;background:#041d3b;font-size:10px}
+.chat-composer .analyse-button:hover:not(:disabled){background:#2a78d6}
+
+/* Flood map: tier legend, pulses, fallback dots */
+.map-pulse-layer{position:absolute;inset:0;pointer-events:none}
+.map-pulse{position:absolute;width:var(--size);height:var(--size);margin:calc(var(--size) / -2) 0 0 calc(var(--size) / -2);border-radius:50%;border:2px solid var(--pulse);background:color-mix(in srgb,var(--pulse) 18%,transparent);animation:map-pulse 1.8s ease-out infinite;pointer-events:none}
+@keyframes map-pulse{0%{transform:scale(.35);opacity:.95}100%{transform:scale(1.5);opacity:0}}
+@media(prefers-reduced-motion:reduce){.map-pulse{animation:none;opacity:.4}}
+.tier-legend{width:300px!important}
+.tier-legend>span{display:block;margin-bottom:6px;color:var(--tier)!important;font:700 8px var(--mono)!important}
+.tier-legend .legend-row{margin-top:5px;display:flex!important;align-items:center;gap:7px;justify-content:flex-start!important;color:#3d4f63;font-size:9.5px}
+.tier-legend .legend-row b{color:#041d3b}
+.tier-legend i{flex:0 0 auto;display:inline-block}
+.tier-legend i.dot{width:11px;height:11px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+.tier-legend i.dot.dry{width:7px;height:7px;margin:0 2px;background:#8a96a2}
+.tier-legend i.ramp{width:28px;height:7px;border-radius:4px}
+.tier-legend i.line{width:22px;border-top:2px dashed}
+.tier-legend i.hull{width:18px;height:12px;border:1.5px solid;border-radius:3px}
+.tier-legend i.pulse-key{width:12px;height:12px;border-radius:50%;border:2px solid var(--pulse);animation:map-pulse 1.8s ease-out infinite}
+.tier-buttons button.active{background:color-mix(in srgb,var(--tier) 10%,#fff)}
+.fallback-dot{position:absolute;width:calc(8px + var(--s) * 14px);height:calc(8px + var(--s) * 14px);transform:translate(-50%,-50%);border:2px solid #fff;border-radius:50%;background:var(--pin);opacity:.85;padding:0}

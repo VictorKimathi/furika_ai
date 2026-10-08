@@ -42,9 +42,7 @@ import {
   Plus,
   Search,
   Send,
-  Settings2,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
   TableProperties,
   TrendingUp,
@@ -68,18 +66,20 @@ import './recent-chats.css';
 import './data-sources.css';
 import './readability.css';
 import './brand.css';
-import kenyaReLogo from './assets/kenya-re-logo.png';
+import kenyaReLogo from './assets/kenya-re-logo-light.png';
+import FurikaMascot from './FurikaMascot.jsx';
 import PortfolioScreen from './PortfolioScreen.jsx';
 import { API_BASE_URL as BACKEND_URL, PORTFOLIO_ID, apiGet, apiRequest } from './api.js';
 import FormattedText from './FormattedText.jsx';
 import StageDrawer from './StageMetrics.jsx';
 
+// Scenario tiers on the map: common (rarest flood, widest footprint) in blue through to severe in red.
 const TIERS = [
-  { id: 'common', label: 'Common', range: '0.0–0.2', color: '#38bdf8', loss: 68.4, ratio: 1.4 },
-  { id: 'occasional', label: 'Occasional', range: '0.2–0.4', color: '#10b981', loss: 184.2, ratio: 3.8 },
-  { id: 'moderate', label: 'Moderate', range: '0.4–0.6', color: '#f59e0b', loss: 412.0, ratio: 8.5 },
-  { id: 'severe', label: 'Severe', range: '0.6–0.8', color: '#ea580c', loss: 895.5, ratio: 18.6 },
-  { id: 'extreme', label: 'Extreme', range: '0.8–1.0', color: '#e11d48', loss: 1642.0, ratio: 34.1 },
+  { id: 'common', label: 'Common', range: '1 in 250', color: '#2a78d6' },
+  { id: 'occasional', label: 'Occasional', range: '1 in 100', color: '#1baf7a' },
+  { id: 'moderate', label: 'Moderate', range: '1 in 50', color: '#eda100' },
+  { id: 'severe', label: 'Severe', range: '1 in 25', color: '#e34948' },
+  { id: 'extreme', label: 'Extreme', range: '1 in 10', color: '#a3123f' },
 ];
 
 const HOTSPOTS = [
@@ -203,35 +203,6 @@ function Login({ onLogin }) {
   </main>;
 }
 
-function MiniEpCurve() {
-  return <div className="ep-card">
-    <div className="card-title"><div><strong>Exceedance probability vs. loss</strong><span>KES M · assumed tier mapping</span></div><TrendingUp size={17} /></div>
-    <svg viewBox="0 0 380 145" role="img" aria-label="Increasing loss curve from common to extreme scenario">
-      <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0891b2" stopOpacity=".24"/><stop offset="1" stopColor="#0891b2" stopOpacity="0"/></linearGradient></defs>
-      {[24, 64, 104].map((y) => <line key={y} x1="38" y1={y} x2="365" y2={y} stroke="#dbe4ea" strokeDasharray="3 4" />)}
-      <path d="M42 116 C85 114, 106 108, 130 101 S183 90, 210 78 S267 56, 292 35 S336 22, 360 18 L360 121 L42 121Z" fill="url(#area)" />
-      <path d="M42 116 C85 114, 106 108, 130 101 S183 90, 210 78 S267 56, 292 35 S336 22, 360 18" fill="none" stroke="#041c39" strokeWidth="3" />
-      {[[42,116,'#38bdf8'],[130,101,'#10b981'],[210,78,'#f59e0b'],[292,35,'#ea580c'],[360,18,'#e11d48']].map(([x,y,c]) => <circle key={x} cx={x} cy={y} r="4" fill={c} />)}
-      <text x="5" y="28">1,600</text><text x="13" y="68">800</text><text x="22" y="108">200</text>
-      <text x="34" y="138">Common</text><text x="176" y="138">Moderate</text><text x="325" y="138">Extreme</text>
-    </svg>
-  </div>;
-}
-
-function ModelSummary() {
-  return <div className="model-answer">
-    <p>Across the <strong>600 synthetic assets</strong>, total insured exposure is <strong>KES 4.82B</strong>. Loss rises monotonically across the five proxy scenarios.</p>
-    <div className="pipeline"><span>Hazard proxy</span><i>→</i><span>Vulnerability</span><i>→</i><span>Exposure</span><i>→</i><span>Loss</span></div>
-    <div className="summary-metrics"><div><span>TOTAL EXPOSURE</span><strong>KES 4.82B</strong><small>600 synthetic assets</small></div><div><span>EXTREME SCENARIO</span><strong className="danger">KES 1.642B</strong><small>34.1% mean loss ratio</small></div></div>
-    <div className="loss-table"><div className="table-head"><span>SCENARIO</span><span>LOSS</span><span>RATIO</span></div>{TIERS.map((tier) => <div key={tier.id}><span><i style={{background:tier.color}} />{tier.label}</span><strong>KES {tier.loss >= 1000 ? `${(tier.loss/1000).toFixed(3)}B` : `${tier.loss.toFixed(1)}M`}</strong><em>{tier.ratio}%</em></div>)}</div>
-    <MiniEpCurve />
-    <div className="housing-card"><div className="card-title"><div><strong>Vulnerability by structural class</strong><span>Severe proxy tier · model assumption</span></div></div>
-      {[['Informal / corrugated sheet',72,'#e11d48'],['Unreinforced masonry',41,'#ea580c'],['Engineered reinforced concrete',14,'#0891b2']].map(([label,value,color]) => <div className="housing-row" key={label}><span>{label}</span><div><i style={{width:`${value}%`,background:color}} /></div><strong>{value}% MDR</strong></div>)}
-    </div>
-    <div className="citation"><FileText size={14} /><span><strong>Sources:</strong> exposure_nairobi_with_hazard.csv; 30m DEM TWI/HAND proxy; JRC/Huizinga reference vulnerability curves. Calculations: loss = MDR × insured value.</span></div>
-  </div>;
-}
-
 function parseProperty(text) {
   const amountMatch = text.match(/(?:kes\s*)?(\d+(?:\.\d+)?)\s*(m|million|b|billion)?/i);
   let value = amountMatch ? Number(amountMatch[1]) : 25;
@@ -259,7 +230,7 @@ const THINKING_STAGES = [
   { title: 'Preparing the response', detail: 'Formatting evidence for an underwriter' },
 ];
 
-const INITIAL_CHAT_MESSAGE = { role: 'assistant', content: 'Welcome to Furika AI. Select an uploaded data source with Add context, or ask about a portfolio property or workflow run.' };
+const INITIAL_CHAT_MESSAGE = { role: 'assistant', content: "Hi, I'm **Furi**, the Furika Bot. Ask me about your portfolio, a property's flood risk or losses, or attach a file from the Data store with **Add context**." };
 
 function ThinkingTrace({ activeStep, onOpenWorkflow }) {
   return <div className="thinking-trace"><header><div><span className="thinking-orb"><Sparkles size={14}/></span><span><strong>Furika AI is working</strong><small>Auditable activity · no hidden reasoning shown</small></span></div><button onClick={() => onOpenWorkflow('workflow', true)}><Workflow size={13}/> See activity</button></header><div className="thinking-stages">{THINKING_STAGES.map((stage,index)=>{const state=index<activeStep?'done':index===activeStep?'active':'waiting';return <div className={state} key={stage.title}><i>{state==='done'?<Check size={11}/>:state==='active'?<span/>:index+1}</i><span><strong>{stage.title}</strong><small>{stage.detail}</small></span></div>})}</div></div>;
@@ -410,12 +381,12 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
   const selectedSourceProcessing = dataSources.some((source) => attachedSourceIds.includes(source.id) && source.processing);
 
   return <section className="chat-panel">
-    <header className="panel-header"><div className="panel-title"><div><Bot size={19} /></div><span><strong>Furika AI Cat Analyst <i /></strong><small>Hazard → Vulnerability → Exposure → Loss</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Recent chats" onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/><span>Recent</span></button><button title="New conversation" onClick={startNewChat}><Plus size={16}/></button></div></header>
+    <header className="panel-header"><div className="panel-title"><div className="bot-avatar"><FurikaMascot size={34} animated/></div><span><strong>Furika Bot <i /></strong><small>Your flood-risk analyst · Hazard → Vulnerability → Exposure → Loss</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Recent chats" onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/><span>Recent</span></button><button title="New conversation" onClick={startNewChat}><Plus size={16}/></button></div></header>
     {historyOpen && <aside className="recent-chats"><div className="recent-chats-head"><div><History size={15}/><strong>Recent chats</strong></div><button onClick={()=>setHistoryOpen(false)}><X size={15}/></button></div><button className="new-chat-button" onClick={startNewChat}><Plus size={14}/> New analysis</button><div className="recent-chat-list">{recentChats.length?recentChats.map((chat)=><button key={chat.id} className={chat.id===activeChatId?'active':''} onClick={()=>openRecentChat(chat)}><MessageSquareText size={14}/><span><strong>{chat.title}</strong><small>{new Date(chat.updatedAt).toLocaleDateString('en-KE',{month:'short',day:'numeric'})} · {new Date(chat.updatedAt).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</small></span><i onClick={(event)=>removeRecentChat(event,chat.id)} title="Delete chat"><Trash2 size={13}/></i></button>):<div className="no-recent-chats"><MessageSquareText size={20}/><strong>No recent chats</strong><span>Your completed conversations will appear here.</span></div>}</div></aside>}
     <div className="chat-thread" ref={thread}>
       <div className="analyst-banner"><Sparkles size={15} /><div><strong>{portfolioSummary?.status === 'approved' ? 'Approved portfolio results available' : 'Dataset-grounded analyst'}</strong><span>Select a data source to ask about its uploaded contents.</span></div></div>
       {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-        <div className="message-meta">{message.role === 'assistant' ? 'FURIKA CAT MODELLING ENGINE' : 'DR. A. OMONDI'} <span>· just now</span></div>
+        <div className="message-meta">{message.role === 'assistant' ? <span className="bot-meta"><FurikaMascot size={16}/> FURIKA BOT</span> : 'DR. A. OMONDI'} <span>· just now</span></div>
         <div className="message-bubble">{message.role === 'assistant' ? <FormattedText text={message.content}/> : <p>{message.content}</p>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.source && <small className="message-source"><FileText size={11} /> {message.source}{message.citations?.length > 0 && ` · ${[...new Set(message.citations.map(citationLabel))].filter((label) => label !== message.source).slice(0, 4).join(', ')}`}</small>}{message.actions && <ResponseActions reportReady={reportReady} onOpenView={onOpenView} workflow={message.workflow} onReviewRun={onWorkflowPending}/>}</div>
       </div>)}
       {preview && <ExposurePreview asset={preview} onConfirm={confirmAsset} onCancel={() => setPreview(null)} />}
@@ -563,53 +534,153 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
   </section>;
 }
 
+const LINK_KM = 1.2;
+const MAX_LINKS = 3;
+const PULSE_COUNT = 40;
+
+const distanceKm = (a, b) => {
+  const toRad = (value) => value * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+
+function convexHull(points) {
+  const sorted = [...points].sort((a, b) => a.lng - b.lng || a.lat - b.lat);
+  const cross = (o, a, b) => (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng);
+  const build = (list) => list.reduce((hull, point) => { while (hull.length >= 2 && cross(hull.at(-2), hull.at(-1), point) <= 0) hull.pop(); hull.push(point); return hull; }, []);
+  const lower = build(sorted), upper = build([...sorted].reverse());
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+// Wet properties in the active tier, links between wet neighbours, and connected flood clusters.
+function buildFloodMesh(assets) {
+  const wet = assets.filter((asset) => asset.score > 0);
+  const edges = [];
+  const seen = new Set();
+  const parent = wet.map((_, index) => index);
+  const find = (index) => (parent[index] === index ? index : (parent[index] = find(parent[index])));
+  wet.forEach((asset, i) => {
+    const near = [];
+    wet.forEach((other, j) => { if (i !== j) { const d = distanceKm(asset, other); if (d <= LINK_KM) near.push([d, j]); } });
+    near.sort((a, b) => a[0] - b[0]).slice(0, MAX_LINKS).forEach(([, j]) => {
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (!seen.has(key)) { seen.add(key); edges.push([wet[i], wet[j]]); }
+      parent[find(i)] = find(j);
+    });
+  });
+  const groups = {};
+  wet.forEach((asset, index) => { (groups[find(index)] ||= []).push(asset); });
+  const clusters = Object.values(groups).filter((members) => members.length >= 4).map((members, index) => ({
+    id: `cluster-${index}`, members, hull: convexHull(members),
+    lat: members.reduce((sum, m) => sum + m.lat, 0) / members.length, lng: members.reduce((sum, m) => sum + m.lng, 0) / members.length,
+    value: members.reduce((sum, m) => sum + (m.value || 0), 0), meanScore: members.reduce((sum, m) => sum + m.score, 0) / members.length,
+  })).sort((a, b) => b.value - a.value);
+  return { wet, edges, clusters };
+}
+
 function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, properties, hotspots, portfolioSummary }) {
   const node = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef([]);
+  const overlaysRef = useRef([]);
+  const pulseRef = useRef(null);
   const [mapStatus, setMapStatus] = useState('loading');
-  const [layers, setLayers] = useState({ hotspots: true, rivers: true, assets: true });
+  const [layers, setLayers] = useState({ hotspots: true, assets: true, mesh: true, pulse: true });
   const [layerMenu, setLayerMenu] = useState(false);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const allAssets = useMemo(() => properties.map((property) => ({ ...property, lat: property.latitude, lng: property.longitude, value: property.insuredValueKes == null ? null : property.insuredValueKes / 1e6, hazard: property.hazardScores?.[activeTier] ?? property.hazardScore, loss: property.loss100Kes == null ? null : property.loss100Kes / 1e6, tier: property.hazardBand, type: property.housingClass, status: property.reviewStatus === 'unconfirmed' ? 'Unconfirmed property' : 'Portfolio property' })), [properties, activeTier]);
+  const currentTier = TIERS.find((tier) => tier.id === activeTier);
+  const allAssets = useMemo(() => properties.filter((property) => property.latitude != null && property.longitude != null).map((property) => ({ ...property, lat: property.latitude, lng: property.longitude, value: property.insuredValueKes == null ? null : property.insuredValueKes / 1e6, score: Number(property.hazardScores?.[activeTier] ?? 0), loss: property.loss100Kes == null ? null : property.loss100Kes / 1e6, type: property.housingClass, status: property.reviewStatus === 'unconfirmed' ? 'Unconfirmed property' : 'Portfolio property' })), [properties, activeTier]);
+  const mesh = useMemo(() => buildFloodMesh(allAssets), [allAssets]);
 
   useEffect(() => {
     if (!apiKey) { setMapStatus('missing'); return undefined; }
     let cancelled = false;
     loadGoogleMaps(apiKey).then((maps) => {
       if (cancelled || !node.current) return;
-      const map = new maps.Map(node.current, { center: { lat: -1.2921, lng: 36.8219 }, zoom: 12, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] },{featureType:'water',elementType:'geometry',stylers:[{color:'#b8e1ea'}]}] });
-      mapRef.current = map; setMapStatus('ready');
+      mapRef.current = new maps.Map(node.current, { center: { lat: -1.2921, lng: 36.8219 }, zoom: 12, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] },{featureType:'water',elementType:'geometry',stylers:[{color:'#b8e1ea'}]},{featureType:'landscape',stylers:[{saturation:-60},{lightness:10}]}] });
+      setMapStatus('ready');
     }).catch(() => setMapStatus('error'));
     return () => { cancelled = true; };
   }, [apiKey]);
 
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps) return;
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    const tierIndex = TIERS.findIndex((tier) => tier.id === activeTier);
-    const visibleHotspots = layers.hotspots ? hotspots.map((spot) => ({ ...spot, lat: spot.latitude, lng: spot.longitude, tier: spot.severity || 'moderate', status: 'Reference hotspot' })) : [];
-    const points = [...visibleHotspots.map((x) => ({...x, kind:'hotspot'})), ...(layers.assets ? allAssets.filter((x) => x.lat != null && x.lng != null).map((x) => ({...x, kind:'asset'})) : [])];
-    markersRef.current = points.map((point) => {
-      const tier = TIERS.find((item) => item.id === point.tier) || TIERS[tierIndex];
-      const marker = new window.google.maps.Marker({ map: mapRef.current, position: { lat: point.lat, lng: point.lng }, title: point.name, icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: point.kind === 'asset' ? 6 : 10, fillColor: point.kind === 'asset' ? '#041c39' : tier.color, fillOpacity: .92, strokeColor: '#fff', strokeWeight: 2 } });
-      marker.addListener('click', () => setSelected(point)); return marker;
-    });
-  }, [mapStatus, activeTier, layers, allAssets, hotspots, setSelected]);
+    const maps = window.google?.maps;
+    if (!mapRef.current || !maps) return undefined;
+    overlaysRef.current.forEach((item) => item.setMap(null));
+    overlaysRef.current = [];
+    const add = (item) => { overlaysRef.current.push(item); return item; };
+    const color = currentTier.color;
 
-  const currentTier = TIERS.find((tier) => tier.id === activeTier);
+    if (layers.mesh) {
+      mesh.clusters.forEach((cluster) => {
+        const polygon = add(new maps.Polygon({ map: mapRef.current, paths: cluster.hull.map((p) => ({ lat: p.lat, lng: p.lng })), fillColor: color, fillOpacity: .12, strokeColor: color, strokeOpacity: .75, strokeWeight: 1.5, zIndex: 1 }));
+        polygon.addListener('click', () => setSelected({ kind: 'cluster', name: `Flood cluster · ${cluster.members.length} properties`, lat: cluster.lat, lng: cluster.lng, count: cluster.members.length, value: cluster.value, meanScore: cluster.meanScore, status: `Connected wet properties within ${LINK_KM} km in the ${currentTier.label.toLowerCase()} scenario` }));
+      });
+      const flow = { path: 'M 0,-1 0,1', strokeOpacity: .9, strokeColor: color, scale: 2 };
+      const lines = mesh.edges.map(([a, b]) => add(new maps.Polyline({ map: mapRef.current, path: [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }], strokeColor: color, strokeOpacity: .25, strokeWeight: 1.4, icons: [{ icon: flow, offset: '0%', repeat: '18px' }], zIndex: 2, clickable: false })));
+      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && lines.length) {
+        let step = 0;
+        const timer = window.setInterval(() => { step = (step + 1) % 180; lines.forEach((line) => line.set('icons', [{ icon: flow, offset: `${step / 1.8}%`, repeat: '18px' }])); }, 120);
+        overlaysRef.current.push({ setMap: () => window.clearInterval(timer) });
+      }
+    }
+
+    if (layers.assets) {
+      allAssets.forEach((asset) => {
+        const wet = asset.score > 0;
+        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: asset.lat, lng: asset.lng }, title: `${asset.name} · ${currentTier.label} score ${asset.score.toFixed(2)}`, zIndex: wet ? 10 + Math.round(asset.score * 100) : 3,
+          icon: { path: maps.SymbolPath.CIRCLE, scale: wet ? 4 + asset.score * 9 : 2.6, fillColor: wet ? color : '#8a96a2', fillOpacity: wet ? .6 + asset.score * .35 : .45, strokeColor: '#fff', strokeWeight: wet ? 1.5 : .8 } }));
+        marker.addListener('click', () => setSelected({ ...asset, kind: 'asset' }));
+      });
+    }
+
+    if (layers.hotspots) {
+      hotspots.forEach((spot) => {
+        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: spot.latitude, lng: spot.longitude }, title: spot.name, zIndex: 200, icon: { path: 'M 0,-9 L 8,6 L -8,6 Z', fillColor: '#041d3b', fillOpacity: .9, strokeColor: '#fff', strokeWeight: 1.5, scale: 1 } }));
+        marker.addListener('click', () => setSelected({ ...spot, kind: 'hotspot', lat: spot.latitude, lng: spot.longitude, status: 'Reference hotspot' }));
+      });
+    }
+
+    if (layers.pulse) {
+      class PulseLayer extends maps.OverlayView {
+        constructor(points) { super(); this.points = points; this.root = document.createElement('div'); this.root.className = 'map-pulse-layer'; }
+        onAdd() {
+          this.points.forEach((point) => { const dot = document.createElement('span'); dot.className = 'map-pulse'; dot.style.setProperty('--pulse', color); dot.style.setProperty('--size', `${18 + point.score * 26}px`); dot.style.animationDelay = `${(point.score * 1.7) % 1.6}s`; this.root.appendChild(dot); });
+          this.getPanes().overlayLayer.appendChild(this.root);
+        }
+        draw() {
+          const projection = this.getProjection();
+          if (!projection) return;
+          [...this.root.children].forEach((dot, index) => { const pixel = projection.fromLatLngToDivPixel(new maps.LatLng(this.points[index].lat, this.points[index].lng)); dot.style.left = `${pixel.x}px`; dot.style.top = `${pixel.y}px`; });
+        }
+        onRemove() { this.root.remove(); }
+      }
+      const top = [...mesh.wet].sort((a, b) => b.score - a.score).slice(0, PULSE_COUNT);
+      if (top.length) { const layer = new PulseLayer(top); layer.setMap(mapRef.current); add(layer); }
+    }
+    return () => { overlaysRef.current.forEach((item) => item.setMap(null)); overlaysRef.current = []; };
+  }, [mapStatus, activeTier, layers, allAssets, mesh, hotspots, setSelected, currentTier]);
+
+  const tierStats = { wet: mesh.wet.length, total: allAssets.length, wetValue: mesh.wet.reduce((sum, asset) => sum + (asset.value || 0), 0), clusters: mesh.clusters.length, links: mesh.edges.length };
   return <section className="map-workspace">
-    <header className="map-toolbar"><div className="map-search"><Search size={15} /><input placeholder="Search Nairobi location or portfolio property" /><span>⌘ K</span></div><button className={layerMenu ? 'active' : ''} onClick={() => setLayerMenu(!layerMenu)}><Layers3 size={16} /> Layers <ChevronDown size={13} /></button><button><Download size={16} /> Export</button></header>
-    <div className="map-canvas">
+    <header className="map-toolbar"><div className="map-search"><Search size={15} /><input placeholder="Search Nairobi location or portfolio property" /><span>⌘ K</span></div><button className={layerMenu ? 'active' : ''} onClick={() => setLayerMenu(!layerMenu)}><Layers3 size={16} /> Layers <ChevronDown size={13} /></button></header>
+    <div className="map-canvas" style={{'--tier': currentTier.color}}>
       <div ref={node} className="google-map" />
-      {mapStatus !== 'ready' && <div className="map-fallback"><div className="map-grid"/><svg viewBox="0 0 900 600"><path d="M20 430 C170 380 210 485 370 410 S600 300 880 350"/><path d="M110 40 C250 160 250 250 410 315 S690 415 800 590"/></svg>{allAssets.slice(0, 20).map((asset) => <button key={asset.id} className="fallback-pin" style={{left:`${Math.max(5,Math.min(85,(asset.lng-36.6)/.5*100))}%`,top:`${Math.max(10,Math.min(85,(-1.1-asset.lat)/.4*100))}%`,'--pin':'#041d3b'}} onClick={() => setSelected(asset)}><MapPin size={22}/><span>{asset.name}</span></button>)}<div className="map-setup"><Map size={22}/><strong>{mapStatus === 'missing' ? 'Add your Google Maps key for the live basemap' : mapStatus === 'error' ? 'Google Maps could not load' : 'Loading Nairobi map…'}</strong>{mapStatus === 'missing' && <span>VITE_GOOGLE_MAPS_API_KEY</span>}</div></div>}
+      {mapStatus !== 'ready' && <div className="map-fallback"><div className="map-grid"/>{allAssets.filter((asset) => asset.score > 0).slice(0, 60).map((asset) => <button key={asset.id} className="fallback-dot" style={{left:`${Math.max(2,Math.min(98,(asset.lng-36.6)/.5*100))}%`,top:`${Math.max(4,Math.min(96,(-1.1-asset.lat)/.4*100))}%`,'--pin':currentTier.color,'--s':asset.score}} title={asset.name} onClick={() => setSelected({ ...asset, kind: 'asset' })}/>)}<div className="map-setup"><Map size={22}/><strong>{mapStatus === 'missing' ? 'Add your Google Maps key for the live basemap' : mapStatus === 'error' ? 'Google Maps could not load' : 'Loading Nairobi map…'}</strong>{mapStatus === 'missing' && <span>VITE_GOOGLE_MAPS_API_KEY</span>}</div></div>}
       <div className="model-run"><span><i/> {portfolioSummary?.status === 'approved' ? 'APPROVED' : 'DRAFT'}: {PORTFOLIO_ID}</span><small>{portfolioSummary ? `KES ${(portfolioSummary.totalInsuredValueKes / 1e9).toFixed(3)}B TIV · ${portfolioSummary.propertyCount} properties` : 'Loading portfolio…'}</small></div>
       <div className="tier-control"><div><span>HAZARD SUSCEPTIBILITY TIER</span><small>Proxy score · not flood depth</small></div><div className="tier-buttons">{TIERS.map((tier) => <button key={tier.id} className={activeTier === tier.id ? 'active' : ''} style={{'--tier':tier.color}} onClick={() => setActiveTier(tier.id)}><i />{tier.label}<span>{tier.range}</span></button>)}</div></div>
-      <div className="map-legend"><span>TERRAIN HAZARD PROXY (TWI / HAND)</span><div className="legend-scale" /><div><small>0.0 · LOW HILL</small><small>1.0 · VALLEY PLAIN</small></div></div>
-      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['hotspots','Documented hotspots'],['rivers','Rivers & drainage'],['assets','Portfolio properties']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Hazard raster: {currentTier.label} ({currentTier.range})</small></div>}
-      {selected && <div className="asset-inspector"><button className="close" onClick={() => setSelected(null)}><X size={15}/></button><span className="inspector-type">{selected.kind === 'hotspot' ? 'REFERENCE HOTSPOT' : 'PORTFOLIO PROPERTY'}</span><h3>{selected.name}</h3><p><MapPin size={12}/> {selected.lat.toFixed(4)}, {selected.lng.toFixed(4)}</p><div className="inspector-grid"><div><span>PROXY SCORE</span><strong>{(selected.hazardScores?.[activeTier] ?? selected.hazard) == null ? 'Pending' : Number(selected.hazardScores?.[activeTier] ?? selected.hazard).toFixed(2)}</strong></div><div><span>ACTIVE TIER</span><strong style={{color:currentTier.color}}>{currentTier.label}</strong></div>{selected.value != null && <><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>APPROVED 1-IN-100 LOSS</span><strong className="danger">{selected.loss == null ? 'Pending run' : `KES ${selected.loss.toFixed(2)}M`}</strong></div></>}</div><div className="inspector-caveat"><AlertTriangle size={13}/>{selected.status || 'Portfolio source'}</div><button className="ask-location" onClick={() => setSelected({...selected, ask:true})}><Bot size={15}/> Ask AI about this location <MessageSquareText size={13}/></button></div>}
+      <div className="map-legend tier-legend">
+        <span>{currentTier.label.toUpperCase()} SCENARIO · {currentTier.range}</span>
+        <div className="legend-row"><i className="dot" style={{background: currentTier.color}}/><b>{tierStats.wet}</b> of {tierStats.total} properties wet · KES {(tierStats.wetValue / 1000).toFixed(2)}B</div>
+        <div className="legend-row"><i className="dot dry"/>Dry in this scenario</div>
+        <div className="legend-row"><i className="ramp" style={{background:`linear-gradient(90deg, ${currentTier.color}55, ${currentTier.color})`}}/>Size and colour = proxy score 0 → 1</div>
+        {layers.mesh && <><div className="legend-row"><i className="line" style={{borderColor: currentTier.color}}/>{tierStats.links} connectors: wet neighbours within {LINK_KM} km</div><div className="legend-row"><i className="hull" style={{borderColor: currentTier.color, background: `${currentTier.color}22`}}/>{tierStats.clusters} flood clusters (4+ connected)</div></>}
+        {layers.pulse && <div className="legend-row"><i className="pulse-key" style={{'--pulse': currentTier.color}}/>Pulsing: {Math.min(PULSE_COUNT, tierStats.wet)} highest scores</div>}
+      </div>
+      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['assets','Portfolio properties'],['mesh','Flood clusters & connectors'],['pulse','Pulse highest scores'],['hotspots','Documented hotspots']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Scenario: {currentTier.label} ({currentTier.range})</small></div>}
+      {selected && <div className="asset-inspector"><button className="close" onClick={() => setSelected(null)}><X size={15}/></button><span className="inspector-type">{selected.kind === 'hotspot' ? 'REFERENCE HOTSPOT' : selected.kind === 'cluster' ? 'FLOOD CLUSTER' : 'PORTFOLIO PROPERTY'}</span><h3>{selected.name}</h3><p><MapPin size={12}/> {selected.lat.toFixed(4)}, {selected.lng.toFixed(4)}</p><div className="inspector-grid">{selected.kind === 'cluster' ? <><div><span>PROPERTIES</span><strong>{selected.count}</strong></div><div><span>MEAN {currentTier.label.toUpperCase()} SCORE</span><strong style={{color:currentTier.color}}>{selected.meanScore.toFixed(2)}</strong></div><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>SCENARIO</span><strong>{currentTier.range}</strong></div></> : <><div><span>{currentTier.label.toUpperCase()} SCORE</span><strong style={{color: (selected.hazardScores?.[activeTier] ?? 0) > 0 ? currentTier.color : undefined}}>{selected.hazardScores?.[activeTier] == null ? 'n/a' : Number(selected.hazardScores[activeTier]).toFixed(2)}</strong></div><div><span>SCENARIO</span><strong style={{color:currentTier.color}}>{currentTier.label} · {currentTier.range}</strong></div>{selected.value != null && <><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>APPROVED 1-IN-100 LOSS</span><strong className="danger">{selected.loss == null ? 'Pending run' : `KES ${selected.loss.toFixed(2)}M`}</strong></div></>}</>}</div><div className="inspector-caveat"><AlertTriangle size={13}/>{selected.status || 'Portfolio source'}</div>{selected.kind !== 'cluster' && <button className="ask-location" onClick={() => setSelected({...selected, ask:true})}><Bot size={15}/> Ask Furika Bot about this location <MessageSquareText size={13}/></button>}</div>}
     </div>
-    <footer className="coordinates">LAT: -1.2921° S <i/> LON: 36.8219° E <i/> DEM: 1,680m ASL <i/> CATCHMENT: Nairobi–Athi <span>GOOGLE MAPS · PROXY OVERLAY</span></footer>
+    <footer className="coordinates">{currentTier.label} scenario <i/> {tierStats.wet} wet properties <i/> {tierStats.clusters} clusters <i/> {tierStats.links} connectors <span>GOOGLE MAPS · PROXY OVERLAY</span></footer>
   </section>;
 }
 
@@ -781,7 +852,7 @@ function Workspace({ onLogout }) {
   };
   return <main className={`workspace ${chatOpen ? '' : 'chat-collapsed'} ${navExpanded ? 'nav-expanded' : ''}`}>
     <header className="app-header minimal"><Brand /><div className="header-actions"><button className="profile-button"><span className="header-avatar">AO</span><span>Dr. A. Omondi</span></button><button onClick={onLogout} title="Sign out"><LogOut size={16}/></button></div></header>
-    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='workspace'?'active':''} onClick={()=>setActiveScreen('workspace')}><Map size={19}/><strong>Workspace</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data sources</strong></button><button><SlidersHorizontal size={19}/><strong>Assumptions</strong></button><button><Settings2 size={19}/><strong>Settings</strong></button></div></nav>
+    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data store</strong></button><button className={`rail-bot ${activeScreen==='workspace'?'active':''}`} onClick={()=>setActiveScreen('workspace')}><FurikaMascot size={26}/><strong>Furika Bot</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button></div></nav>
       {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource} onReprocessSource={reprocessDataSource} attested={attested} setAttested={setAttested} loadState={sourcesLoad} uploadErrors={uploadErrors} onDismissErrors={() => setUploadErrors([])}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} onWorkflowPending={showPendingRun} reportReady={reportReady} portfolioSummary={portfolioSummary} dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} properties={mapProperties} hotspots={mapHotspots} portfolioSummary={portfolioSummary}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} reloadSignal={workflowReloadSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>{setReportReady(true);refreshMap()}}/></div></div></div>}</div>}
     </div>
   </main>;
