@@ -32,7 +32,7 @@ ALTERNATIVE_TIER_RP = {
 DEFAULT_D_MAX = 4.0
 DEFAULT_WET_THRESHOLD = 0.0
 NAIROBI_BOUNDS = {"lat_min": -1.50, "lat_max": -1.10, "lon_min": 36.60, "lon_max": 37.10}
-VALID_CLASSES = ("informal_iron_sheet", "semi_permanent", "permanent_masonry")
+VALID_CLASSES = ("informal_iron_sheet", "semi_permanent", "permanent_masonry", "concrete_rcc")
 REQUIRED_EXPOSURE_COLUMNS = [
     "loc_id",
     "lat",
@@ -50,6 +50,9 @@ DEFAULT_VULN = {
     "informal_iron_sheet": {"dr_max": 0.95, "d50": 0.55, "k": 3.5},
     "semi_permanent": {"dr_max": 0.85, "d50": 0.80, "k": 3.0},
     "permanent_masonry": {"dr_max": 0.65, "d50": 1.20, "k": 2.4},
+    # Engineered reinforced concrete: relative vulnerability 0.6 of masonry (prototype weights RCC 0.30 vs masonry 0.50),
+    # later onset and a gentler slope. Contents and basement plant are not modelled separately.
+    "concrete_rcc": {"dr_max": 0.39, "d50": 1.60, "k": 2.2},
 }
 
 
@@ -89,6 +92,8 @@ def validate_vuln_params(params: Mapping[str, Mapping[str, float]]) -> list[str]
         issues.append("Informal vulnerability must not fall below semi-permanent vulnerability.")
     if np.any(curves["semi_permanent"] + 1e-12 < curves["permanent_masonry"]):
         issues.append("Semi-permanent vulnerability must not fall below masonry vulnerability.")
+    if np.any(curves["permanent_masonry"] + 1e-12 < curves["concrete_rcc"]):
+        issues.append("Masonry vulnerability must not fall below reinforced-concrete vulnerability.")
     return issues
 
 

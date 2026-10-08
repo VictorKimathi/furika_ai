@@ -89,7 +89,7 @@ def test_create_property_validates_and_persists(seeded):
     assert created.json["reviewStatus"] == "unconfirmed"  # 1.08 km from the nearest grid point
     assert seeded.get(f"{BASE}/summary").json["propertyCount"] == 7
 
-    bad = seeded.post(f"{BASE}/properties", json={"name": "Concrete tower", "latitude": -1.3071, "longitude": 36.8912, "housingClass": "RCC high-rise", "floorAreaM2": 750, "costPerM2Kes": 140000})
+    bad = seeded.post(f"{BASE}/properties", json={"name": "Concrete tower", "latitude": -1.3071, "longitude": 36.8912, "housingClass": "Steel frame", "floorAreaM2": 750, "costPerM2Kes": 140000})
     assert bad.status_code == 422
     duplicate = seeded.post(f"{BASE}/properties", json={"id": "NBO-0002", "name": "Dup", "latitude": -1.3071, "longitude": 36.8912, "housingClass": "permanent_masonry", "floorAreaM2": 1, "costPerM2Kes": 1})
     assert duplicate.status_code == 409

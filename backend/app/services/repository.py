@@ -24,7 +24,7 @@ from .ingestion.validation import CANONICAL_FIELDS, EDIT_REQUIRED_CODES
 PENDING = "pending"
 VISIBLE_SEVERITIES = ("warning", "review")
 CLUSTER_TYPES = ("neighbourhood", "grid", "hazard_band", "housing_class")
-CLASS_MIX_KEYS = {"informal_iron_sheet": "informal", "semi_permanent": "semiPermanent", "permanent_masonry": "masonry"}
+CLASS_MIX_KEYS = {"informal_iron_sheet": "informal", "semi_permanent": "semiPermanent", "permanent_masonry": "masonry", "concrete_rcc": "concrete"}
 SORT_COLUMNS = {"tiv": Property.insured_value_kes, "name": Property.name, "id": Property.id, "floorArea": Property.floor_area_m2}
 MAX_LIMIT = 2000
 LOCAL_RADIUS_KM = 0.5
@@ -196,6 +196,11 @@ def list_properties(portfolio_id: str, filters: dict) -> dict | None:
     if db.session.get(Portfolio, portfolio_id) is None:
         return None
     query = Property.query.filter(Property.portfolio_id == portfolio_id)
+    upload_id = filters.get("uploadId")
+    if upload_id:
+        if Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first() is None:
+            raise RepositoryError("The selected upload was not found in this portfolio.", 404)
+        query = query.filter(Property.upload_id == upload_id)
 
     text = (filters.get("q") or "").strip()
     if text:
@@ -376,12 +381,17 @@ def property_detail(property_id: str, include_draft: bool = False) -> dict | Non
     }
 
 
-def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
+def list_clusters(portfolio_id: str, cluster_type: str, upload_id: str | None = None) -> dict | None:
     if db.session.get(Portfolio, portfolio_id) is None:
         return None
     if cluster_type not in CLUSTER_TYPES:
         raise RepositoryError(f"type must be one of {', '.join(CLUSTER_TYPES)}.")
-    props = Property.query.filter_by(portfolio_id=portfolio_id).all()
+    query = Property.query.filter_by(portfolio_id=portfolio_id)
+    if upload_id:
+        if Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first() is None:
+            raise RepositoryError("The selected upload was not found in this portfolio.", 404)
+        query = query.filter(Property.upload_id == upload_id)
+    props = query.all()
     total_tiv = sum(_num(prop.insured_value_kes) or 0 for prop in props)
     approved = _approved_run(portfolio_id)
     losses = {item.property_id: item for item in LossResult.query.filter_by(model_run_id=approved.id)} if approved else {}
@@ -396,7 +406,7 @@ def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
         elif cluster_type == "housing_class":
             key = prop.housing_class or "Unassigned"
         elif cluster_type == "grid":  # ~5.5 km cells
-            key = f"Grid {round(float(prop.latitude) / 0.05) * 0.05:.2f}, {round(float(prop.longitude) / 0.05) * 0.05:.2f}"
+            key = f"Grid {round(float(prop.latitude) / 0.05) * 0.05:.2f}, {round(float(prop.longitude) / 0.05) * 0.05:.2f}" if prop.latitude is not None and prop.longitude is not None else "Unlocated"
         else:
             hazard = hazards.get(prop.id)
             key = _risk_band(_num(hazard.annual_flood_probability)) if hazard else PENDING
@@ -405,6 +415,7 @@ def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
     items = []
     for name, members in groups.items():
         tiv = sum(_num(prop.insured_value_kes) or 0 for prop in members)
+        geocoded = [prop for prop in members if prop.latitude is not None and prop.longitude is not None]
         classes = Counter(CLASS_MIX_KEYS.get(prop.housing_class, "other") for prop in members)
         modelled = [prop for prop in members if prop.id in losses]
         l100 = sum(_num(losses[prop.id].loss_100_kes) or 0 for prop in modelled) if modelled else None
@@ -417,6 +428,10 @@ def list_clusters(portfolio_id: str, cluster_type: str) -> dict | None:
             "name": name,
             "type": cluster_type,
             "propertyCount": len(members),
+            "geocodedCount": len(geocoded),
+            "unconfirmedCount": sum(prop.review_status != "confirmed" for prop in members),
+            "centroidLat": sum(float(prop.latitude) for prop in geocoded) / len(geocoded) if geocoded else None,
+            "centroidLng": sum(float(prop.longitude) for prop in geocoded) / len(geocoded) if geocoded else None,
             "insuredValueKes": tiv,
             "tivShare": tiv / total_tiv if total_tiv else None,
             "loss100Kes": l100,

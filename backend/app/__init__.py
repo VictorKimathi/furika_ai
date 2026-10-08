@@ -1,7 +1,9 @@
+import logging
+import time
 from pathlib import Path
 
 import click
-from flask import Flask
+from flask import Flask, g, request
 from flask_cors import CORS
 
 from .config import Config
@@ -9,10 +11,43 @@ from .extensions import api as rest_api
 from .extensions import db, migrate
 
 
+def _configure_logging(app: Flask) -> None:
+    """One readable line per event for everything under app.* (model runs, chat, ingestion)."""
+    logger = logging.getLogger("app")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+    logger.setLevel(app.config.get("LOG_LEVEL", "INFO"))
+    logger.propagate = False
+
+
+def _log_requests(app: Flask) -> None:
+    """Log each API call with its request ID (from the browser's X-Request-ID) and echo the ID back."""
+    from .services.run_trace import request_id
+
+    log = logging.getLogger("app.http")
+
+    @app.before_request
+    def start_timer():
+        g.request_started = time.perf_counter()
+        request_id()
+
+    @app.after_request
+    def log_request(response):
+        if request.path.startswith("/api/") and request.method != "OPTIONS":
+            ms = round((time.perf_counter() - g.get("request_started", time.perf_counter())) * 1000, 1)
+            level = logging.WARNING if response.status_code >= 400 else logging.INFO
+            log.log(level, "%s %s -> %s %sms request=%s", request.method, request.full_path.rstrip("?"), response.status_code, ms, request_id())
+            response.headers["X-Request-ID"] = request_id()
+        return response
+
+
 def create_app(config_object=Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_object)
     app.url_map.strict_slashes = False
+    _configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -20,9 +55,11 @@ def create_app(config_object=Config) -> Flask:
         app,
         resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}},
         supports_credentials=True,
+        expose_headers=["X-Request-ID"],
     )
 
     rest_api.init_app(app)
+    _log_requests(app)
 
     from .api import register_namespaces
 

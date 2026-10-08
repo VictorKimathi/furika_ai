@@ -4,6 +4,7 @@ from flask import Response, request, stream_with_context
 from flask_restx import Namespace, Resource
 
 from ..services import model_runs, run_metrics
+from ..services.run_trace import RunFailed
 from ..extensions import db
 from ..models import ModelRun
 from .swagger_models import (
@@ -16,6 +17,16 @@ from .swagger_models import (
 
 
 ns = Namespace("model-runs", description="Agentic catastrophe-model workflow and human review", path="/model-runs")
+
+
+def _abort_with_trace(exc: Exception):
+    """Refusals keep their status; crashes roll back and return 500. Both say which step stopped and carry the trace."""
+    if isinstance(exc, RunFailed):
+        db.session.rollback()
+        ns.abort(500, str(exc), error="run_failed", step=exc.step, traceId=exc.trace.id, trace=exc.trace.as_dict())
+    trace = getattr(exc, "trace", None)
+    failed = next((step["step"] for step in reversed(trace.steps) if step["status"] != "ok"), None) if trace else None
+    ns.abort(exc.status, str(exc), error="run_rejected", step=failed, traceId=trace.id if trace else None, trace=trace.as_dict() if trace else None)
 
 
 @ns.route("")
@@ -34,8 +45,8 @@ class ModelRunCollectionResource(Resource):
         """Start a model run. A real worker queue can replace the dummy service later."""
         try:
             return model_runs.create(request.get_json() or {}), 202
-        except model_runs.RunError as exc:
-            ns.abort(exc.status, str(exc))
+        except (model_runs.RunError, RunFailed) as exc:
+            _abort_with_trace(exc)
 
 
 @ns.route("/<string:run_id>")
@@ -100,8 +111,8 @@ class ModelRunDecisionResource(Resource):
         payload = request.get_json()
         try:
             return model_runs.decide(run_id, payload["action"], payload.get("comment"))
-        except model_runs.RunError as exc:
-            ns.abort(exc.status, str(exc))
+        except (model_runs.RunError, RunFailed) as exc:
+            _abort_with_trace(exc)
 
 
 @ns.route("/<string:run_id>/cancel")

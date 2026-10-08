@@ -42,6 +42,24 @@ def test_property_search(seeded):
     assert response.json["total"] == 2
 
 
+def test_accumulation_regions_can_be_filtered_by_uploaded_dataset(seeded):
+    uploads = seeded.get("/api/v1/portfolios/SYN-PORT-142/uploads").json["items"]
+    upload_id = uploads[0]["id"]
+    properties = seeded.get(f"/api/v1/portfolios/SYN-PORT-142/properties?uploadId={upload_id}&limit=2000")
+    clusters = seeded.get(f"/api/v1/portfolios/SYN-PORT-142/clusters?type=neighbourhood&uploadId={upload_id}")
+    assert properties.status_code == 200
+    assert clusters.status_code == 200
+    assert sum(item["propertyCount"] for item in clusters.json["items"]) == properties.json["total"]
+    assert all(item["geocodedCount"] <= item["propertyCount"] for item in clusters.json["items"])
+    assert all(item["centroidLat"] is not None for item in clusters.json["items"] if item["geocodedCount"])
+
+
+def test_accumulation_rejects_upload_outside_portfolio(seeded):
+    for path in ("properties", "clusters"):
+        response = seeded.get(f"/api/v1/portfolios/SYN-PORT-142/{path}?uploadId=missing-upload")
+        assert response.status_code == 404
+
+
 def test_property_detail(seeded):
     response = seeded.get("/api/v1/properties/NBO-0002")
     assert response.status_code == 200
@@ -109,6 +127,75 @@ def test_chat_tries_claude_then_gemini(monkeypatch):
     monkeypatch.setattr(chat_provider, "_gemini", gemini_up)
     assert chat_provider.answer("question") == ("Grounded answer", "gemini", "gemini-3.8-flash")
     assert calls == ["claude", "gemini"]
+
+
+def test_chat_uses_gpt_luna_after_claude_and_gemini_fail(monkeypatch):
+    from app.services import chat_provider
+
+    calls = []
+    def unavailable(provider):
+        def call(_prompt):
+            calls.append(provider)
+            raise chat_provider.ChatProviderError(f"{provider} unavailable")
+        return call
+    def openai_up(_prompt):
+        calls.append("openai")
+        return "Grounded answer", "gpt-5.6-luna"
+    monkeypatch.setattr(chat_provider, "_claude", unavailable("claude"))
+    monkeypatch.setattr(chat_provider, "_gemini", unavailable("gemini"))
+    monkeypatch.setattr(chat_provider, "_openai", openai_up)
+    assert chat_provider.answer("question") == ("Grounded answer", "openai", "gpt-5.6-luna")
+    assert calls == ["claude", "gemini", "openai"]
+
+
+def test_gpt_luna_responses_request_is_private_and_reads_message_text(monkeypatch):
+    import io
+    import json
+    from app.services import chat_provider
+
+    observed = {}
+    def fake_urlopen(request, timeout):
+        observed["url"] = request.full_url
+        observed["key"] = request.get_header("Authorization")
+        observed["body"] = json.loads(request.data)
+        observed["timeout"] = timeout
+        return io.BytesIO(json.dumps({"status": "completed", "output": [
+            {"type": "reasoning", "summary": []},
+            {"type": "message", "content": [{"type": "output_text", "text": "Grounded answer"}]},
+        ]}).encode())
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.delenv("RISK_ATLAS_OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.setattr(chat_provider.urllib.request, "urlopen", fake_urlopen)
+    assert chat_provider._openai("Portfolio evidence") == ("Grounded answer", "gpt-5.6-luna")
+    assert observed["url"] == "https://api.openai.com/v1/responses"
+    assert observed["key"] == "Bearer test-openai-key"
+    assert observed["body"]["model"] == "gpt-5.6-luna"
+    assert observed["body"]["input"] == "Portfolio evidence"
+    assert observed["body"]["instructions"] == chat_provider.SYSTEM
+    assert observed["body"]["store"] is False
+
+
+def test_gpt_luna_uses_risk_atlas_model_setting(monkeypatch):
+    import io
+    import json
+    from app.services import chat_provider
+
+    observed = {}
+    def fake_urlopen(request, timeout):
+        observed["body"] = json.loads(request.data)
+        return io.BytesIO(json.dumps({"status": "completed", "output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "Grounded answer"}]},
+        ]}).encode())
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5.6-luna")
+    monkeypatch.setenv("RISK_ATLAS_OPENAI_MODEL", "gpt-6-luna")
+    monkeypatch.setattr(chat_provider.urllib.request, "urlopen", fake_urlopen)
+
+    assert chat_provider._openai("Portfolio evidence") == ("Grounded answer", "gpt-6-luna")
+    assert observed["body"]["model"] == "gpt-6-luna"
+    assert observed["body"]["reasoning"] == {"effort": "low"}
 
 
 def test_claude_code_key_is_accepted_for_chat(monkeypatch):

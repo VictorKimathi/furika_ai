@@ -1,8 +1,12 @@
 # Furika AI Flask backend
 
-Backend for the Furika AI catastrophe-modelling frontend. Portfolio, property, upload, chat and model-run routes read PostgreSQL. Model runs calculate score-to-depth, vulnerability, property-loss, EP and AAL from confirmed uploaded properties and publish results after review. Chat retrieves selected uploaded rows and document text, then tries Gemini followed by Claude. Some other routes still expose prototype behavior.
+Backend for the Furika AI catastrophe-modelling frontend. Portfolio, property, upload, chat and model-run routes read PostgreSQL. Model runs calculate score-to-depth, vulnerability, property-loss, EP and AAL from confirmed uploaded properties and publish results after review. Chat retrieves selected uploaded rows and document text, then tries Claude, Gemini, and OpenAI GPT-5.6 Luna in that order. Some other routes still expose prototype behavior.
+
+Pasted placement memoranda and selected uploaded placement documents receive separate offer-specific checks for data extraction, hazard intensity, vulnerability, financial loss, accumulation and underwriting flags. `/chat` returns these as `offerChecks` with per-stage results and blocked reasons. They are not portfolio model runs or coverage approvals; an underwriter must review the offer.
 
 ## Quick start
+
+Setting up on a new machine? Follow [docs/setup.md](docs/setup.md): prerequisites, PostgreSQL, every `.env` variable, loading data, moving data from another machine, and troubleshooting.
 
 The virtual environment has already been created in `backend/.venv`.
 
@@ -18,7 +22,7 @@ flask --app run.py seed-reference   # loads data/reference/exposure_nairobi_with
 python run.py
 ```
 
-The default text model is `gemini-3.8-flash`. You can override it with `GEMINI_MODEL` in `.env`.
+Set `OPENAI_API_KEY` and `RISK_ATLAS_OPENAI_MODEL=gpt-6-luna` in `backend/.env` to use GPT-6 Luna as the OpenAI chat fallback. `RISK_ATLAS_OPENAI_MODEL` takes precedence over the legacy `OPENAI_MODEL`; without either setting, the fallback remains `gpt-5.6-luna`. Gemini defaults to `gemini-3.8-flash` and can be changed with `GEMINI_MODEL`.
 
 Open:
 
@@ -73,7 +77,7 @@ All versioned endpoints use `/api/v1`.
 | GET | `/portfolios/{id}/summary` | TIV, AAL, loss, and risk summary |
 | GET | `/portfolios/{id}/properties` | Search/filter/map data |
 | POST | `/portfolios/{id}/properties` | Add synthetic exposure |
-| GET | `/portfolios/{id}/clusters` | Accumulation clusters |
+| GET | `/portfolios/{id}/clusters?type=neighbourhood&uploadId=` | Accumulation by region for all properties or one uploaded dataset; includes counts, TIV, geocoded/review counts and map centroids |
 | GET | `/portfolios/{id}/export` | Export contract |
 | GET | `/properties/{id}` | Complete property detail |
 | GET | `/properties/{id}/hazard` | Hazard-only detail |
@@ -115,7 +119,7 @@ Set the React app's environment value:
 VITE_API_BASE_URL=http://localhost:5000/api/v1
 ```
 
-The Google Maps browser key remains in the frontend and should be restricted by HTTP referrer. Keep `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` (or your existing `CLAUDE_CODE` Anthropic API key), PostgreSQL credentials, and session secrets in the backend only. Chat tries Gemini and retries with Claude when Gemini fails.
+The Google Maps browser key remains in the frontend and should be restricted by HTTP referrer. Keep `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` (or your existing `CLAUDE_CODE` Anthropic API key), PostgreSQL credentials, and session secrets in the backend only. Chat tries Claude, then Gemini, then OpenAI; the OpenAI request sets `store: false`.
 
 ## Remaining prototype routes
 

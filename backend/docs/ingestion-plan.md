@@ -188,6 +188,18 @@ Phases 0 to 2 need no AI key. With a fake LLM they're fully deterministic, so th
 
 OCR of scanned PDFs, elevation and DEM checks, an RCC / basement vulnerability class (rows are flagged, not modelled), access control beyond the current dummy auth, background workers, and object storage.
 
+## Model notes: reviewing the prototype `run_cat_model` script (2026-10-08)
+
+**Adopted**
+- **`concrete_rcc` class:** RCC was missing from the model, which blocked 84 buildings in the reference data. It now has a curve: dr_max 0.39, d50 1.6 m, k 2.2. That is 0.6 × masonry, from the script's relative weights (RCC 0.30 vs masonry 0.50). It is the least vulnerable class at every depth, which the model's ordering check confirms.
+- **RCC aliases at ingestion:** "RCC", "reinforced concrete" and "concrete" descriptions map to `concrete_rcc` (`class_mapped`, info). High-rise and basement descriptions add `basement_not_modelled` (warning).
+- **Run summary:** now includes `classBreakdown` (properties, TIV, AAL and rarest-scenario loss per class) and `topRisks` (the 10 highest-AAL properties).
+
+**Not adopted, and why**
+- **Its return-period mapping (common 5 years … extreme 100 years).** In this dataset the `common` tier has the highest scores and the widest footprint, so it is the rarest flood. The script's mapping makes losses fall as rarity rises and breaks the EP curve. The model keeps extreme 10 … common 250 years and validates that direction.
+- **Its weight table.** The keys (`"informal"`, `"semi-permanent"`, `"permanent masonry"`, `"concrete/RCC"`) don't match the data's class names, so every building falls back to 0.50.
+- **Damage = score × weight.** It treats a susceptibility score as a damage ratio. The model converts the score to a depth (score × D_max) and applies a depth–damage curve per class, and it reports AAL as a range.
+
 ## Phase 4 notes (chat, workflow, map)
 
 - **Chat** (`app/services/chat.py`, `chat_provider.py`):

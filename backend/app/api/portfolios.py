@@ -18,6 +18,7 @@ ns = Namespace("portfolios", description="Portfolio search, summaries, clusters,
 
 property_parser = reqparse.RequestParser()
 property_parser.add_argument("q", type=str, location="args", help="Property ID, neighbourhood, or coordinates")
+property_parser.add_argument("uploadId", type=str, location="args", help="Only properties from this upload")
 property_parser.add_argument("housingClass", type=str, location="args")
 property_parser.add_argument("hazardBand", type=str, location="args", help="Comma-separated risk bands")
 property_parser.add_argument("minTiv", type=float, location="args")
@@ -68,12 +69,12 @@ class PortfolioPropertiesResource(Resource):
 
 @ns.route("/<string:portfolio_id>/clusters")
 class PortfolioClustersResource(Resource):
-    @ns.doc(params={"type": "neighbourhood | grid | hazard_band | housing_class"})
+    @ns.doc(params={"type": "neighbourhood | grid | hazard_band | housing_class", "uploadId": "Optional uploaded data source ID"})
     @ns.marshal_with(cluster_list_response)
     def get(self, portfolio_id):
         """Return cluster exposure for treemap and accumulation cards. Loss metrics are null until a model run completes."""
         try:
-            result = repository.list_clusters(portfolio_id, request.args.get("type", "neighbourhood"))
+            result = repository.list_clusters(portfolio_id, request.args.get("type", "neighbourhood"), request.args.get("uploadId"))
         except RepositoryError as exc:
             ns.abort(exc.status, exc.message)
         if result is None:

@@ -116,6 +116,10 @@ cluster_model = api.model("Cluster", {
     "name": fields.String,
     "type": fields.String(enum=["neighbourhood", "grid", "hazard_band", "housing_class"]),
     "propertyCount": fields.Integer,
+    "geocodedCount": fields.Integer,
+    "unconfirmedCount": fields.Integer,
+    "centroidLat": fields.Float,
+    "centroidLng": fields.Float,
     "insuredValueKes": fields.Float,
     "loss100Kes": fields.Float,
     "aalPercentTiv": fields.Float,
@@ -156,6 +160,7 @@ run_model = api.model("ModelRun", {
     "createdAt": fields.DateTime,
     "stages": fields.List(fields.Nested(run_stage_model)),
     "dummy": fields.Boolean,
+    "trace": fields.Raw(description="Step trace {traceId, action, totalMs, steps[{step, status, ms, detail}]}; also in the Flask log"),
 })
 
 decision_request = api.model("RunDecisionRequest", {
@@ -170,13 +175,17 @@ decision_response = api.model("RunDecisionResponse", {
     "status": fields.String,
     "decidedAt": fields.DateTime,
     "dummy": fields.Boolean,
+    "trace": fields.Raw,
 })
 
 chat_context_model = api.model("ChatContext", {
     "portfolioId": fields.String(required=False),
     "propertyId": fields.String(required=False),
+    "hotspotId": fields.String(required=False),
     "runId": fields.String(required=False),
     "uploadIds": fields.List(fields.String, required=False),
+    "offerText": fields.String(required=False, description="One pasted placement offer carried into a follow-up question."),
+    "offerUploadId": fields.String(required=False, description="One uploaded placement offer carried into a follow-up question."),
 })
 
 chat_request = api.model("ChatRequest", {
@@ -192,6 +201,7 @@ chat_response_model = api.model("ChatResponse", {
     "citations": fields.List(fields.Raw),
     "actions": fields.List(fields.Raw),
     "workflow": fields.Raw(description="Model run backing the answer: {runId, status, created}. status=review means it awaits approval."),
+    "offerChecks": fields.Raw(description="Placement-specific hazard, vulnerability, loss and underwriting checks; not a portfolio run."),
     "provider": fields.String(example="claude"),
     "model": fields.String(example="claude-opus-5-5"),
     "dummy": fields.Boolean,

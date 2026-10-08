@@ -162,7 +162,8 @@ def test_memo_extraction_checks_quotes_and_runs_document_checks(seeded, claude, 
 
     row = seeded.get(f"/api/v1/uploads/{body['id']}/rows").json["items"][0]
     assert row["status"] == "needs_review"
-    assert "unsupported_construction" in {item["code"] for item in row["issues"]}
+    assert {"class_mapped", "basement_not_modelled"} <= {item["code"] for item in row["issues"]}
+    assert row["data"]["housing_class"] == "concrete_rcc"  # "RCC frame high-rise" is modelled as RCC, with a basement warning
     provenance = {item["field"]: item for item in row["provenance"]}
     assert provenance["floor_area_m2"]["method"] == "ai_extracted"
     assert provenance["floor_area_m2"]["page"] == 1
@@ -317,7 +318,7 @@ def test_pdf_table_is_parsed_row_by_row(seeded, monkeypatch):
     assert rows["NBO-T2"]["data"]["floor_area_m2"] == 16
     assert rows["NBO-T1"]["data"]["hazard_score_common"] == 0.458406
     assert rows["NBO-T1"]["data"]["extra"]["source"] == "generated for tests, not a real portfolio"
-    assert rows["NBO-T3"]["status"] == "needs_review"  # concrete_rcc has no vulnerability curve
+    assert rows["NBO-T3"]["status"] == "accepted" and rows["NBO-T3"]["data"]["housing_class"] == "concrete_rcc"
     assert db.session.get(Property, "NBO-T1").review_status == "confirmed"
     codes = [item["code"] for item in issues_of(seeded, body["id"])]
     assert "table_detected" in codes and "unparsed_line" not in codes  # the "Page 2 of 2" footer isn't a record

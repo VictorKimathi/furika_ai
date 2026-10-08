@@ -36,3 +36,18 @@ def test_formatting_helpers():
     assert run_metrics.kes(1_234_000_000) == "KES 1.23 bn"
     assert run_metrics.kes(340_000_000) == "KES 340 m"
     assert run_metrics.permille(0.00911) == "9.11‰"
+
+
+def test_rcc_is_modelled_and_run_summary_has_breakdowns(seeded):
+    import io
+    content = "loc_id,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes,hazard_score_common,hazard_score_occasional,hazard_score_moderate,hazard_score_severe,hazard_score_extreme\nRCC-9,-1.2585,36.8556,concrete_rcc,900,78000,0.6,0.5,0.4,0.3,0.2\nRCC-10,-1.2700,36.8300,Reinforced concrete office,400,80000,0.5,0.4,0.3,0.2,0.1\n"
+    seeded.post(f"{BASE}/portfolios/SYN-PORT-142/uploads", data={"file": (io.BytesIO(content.encode()), "rcc.csv"), "attestation": "synthetic"}, content_type="multipart/form-data")
+    run = seeded.post(f"{BASE}/model-runs", json={"portfolioId": "SYN-PORT-142"}).json
+    summary = run["configuration"]["summary"]
+    assert summary["propertyCount"] == 8  # 6 seeded + 2 RCC
+    classes = {row["housingClass"]: row for row in summary["classBreakdown"]}
+    assert classes["concrete_rcc"]["properties"] == 2 and classes["concrete_rcc"]["aalKes"] > 0
+    assert len(summary["topRisks"]) == 8 and summary["topRisks"][0]["aalKes"] >= summary["topRisks"][-1]["aalKes"]
+    assert summary["topRisks"][0]["largestScenario"] == "common"  # the rarest (1 in 250) tier
+    losses = [tier["loss_kes"] for tier in sorted(summary["tierLosses"], key=lambda tier: tier["rp"])]
+    assert losses == sorted(losses)  # losses still rise with rarity

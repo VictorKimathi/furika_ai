@@ -1,4 +1,4 @@
-"""Grounded chat generation: Claude first (the client used for document parsing), Gemini as backup."""
+"""Grounded chat generation: Claude, then Gemini, then OpenAI GPT-5.6 Luna."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ import urllib.request
 from . import llm
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+OPENAI_URL = "https://api.openai.com/v1/responses"
+OPENAI_TIMEOUT = 45
 
 
 class ChatProviderError(RuntimeError):
@@ -96,10 +98,52 @@ def _gemini(prompt: str) -> tuple[str, str]:
     raise ChatProviderError(f"Gemini request failed: {'; '.join(errors)}")
 
 
+def _openai(prompt: str) -> tuple[str, str]:
+    """Use the Responses API without storing the confidential portfolio response."""
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise ChatProviderError("OpenAI is not configured (set OPENAI_API_KEY)")
+    model = (os.getenv("RISK_ATLAS_OPENAI_MODEL", "").strip()
+             or os.getenv("OPENAI_MODEL", "").strip()
+             or "gpt-5.6-luna")
+    body = json.dumps({
+        "model": model,
+        "instructions": SYSTEM,
+        "input": prompt,
+        "reasoning": {"effort": "low"},
+        "max_output_tokens": 4000,
+        "store": False,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        OPENAI_URL, body,
+        {"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=OPENAI_TIMEOUT) as response:
+            data = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise ChatProviderError(f"OpenAI request failed: HTTP {exc.code}") from exc
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        raise ChatProviderError(f"OpenAI request failed: {type(exc).__name__}") from exc
+    if not isinstance(data, dict) or data.get("status") not in (None, "completed"):
+        raise ChatProviderError("OpenAI response did not complete")
+    outputs = data.get("output")
+    if not isinstance(outputs, list):
+        raise ChatProviderError("OpenAI returned malformed output")
+    parts = [part.get("text", "") for item in outputs if isinstance(item, dict) and item.get("type") == "message"
+             for part in (item.get("content") if isinstance(item.get("content"), list) else [])
+             if isinstance(part, dict) and part.get("type") == "output_text" and isinstance(part.get("text"), str)]
+    text = "\n".join(parts).strip()
+    if not text:
+        raise ChatProviderError("OpenAI returned no text")
+    return text, model
+
+
 def answer(prompt: str) -> tuple[str, str, str]:
-    """Return (answer, provider, model): Claude first, then Gemini. Raises ChatProviderError if both fail."""
+    """Return (answer, provider, model); use OpenAI when Claude and Gemini cannot answer."""
     errors = []
-    for provider, call in (("claude", _claude), ("gemini", _gemini)):
+    for provider, call in (("claude", _claude), ("gemini", _gemini), ("openai", _openai)):
         try:
             text, model = call(prompt)
             return text, provider, model

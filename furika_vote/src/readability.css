@@ -1,67 +1,67 @@
 /* Dashboard-wide type floor. The original prototype used 5–9px labels in many views. */
-.workspace{font-size:13px}
+.workspace{font-size:14.5px}
 .workspace button,
 .workspace input,
 .workspace textarea,
-.workspace select{font-size:11px!important}
+.workspace select{font-size:13.5px!important}
 .workspace textarea,
 .workspace .map-search input,
-.workspace .source-library-toolbar input{font-size:12px!important}
-.workspace small{font-size:10px!important;line-height:1.4}
-.workspace em{font-size:9px!important}
+.workspace .source-library-toolbar input{font-size:13.5px!important}
+.workspace small{font-size:12.5px!important;line-height:1.4}
+.workspace em{font-size:12px!important}
 .workspace svg text{font-size:9px!important}
 
-.workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) span{font-size:10px!important}
-.workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) p{font-size:12px!important;line-height:1.55}
+.workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) span{font-size:12.5px!important}
+.workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) p{font-size:13.5px!important;line-height:1.55}
 
 /* App chrome and navigation */
 .app-header.minimal .brand span,
 .header-avatar,
-.open-right-pane{font-size:11px!important}
-.tool-rail button strong{font-size:13px!important}
-.profile-button span:last-child{font-size:12px!important}
+.open-right-pane{font-size:13.5px!important}
+.tool-rail button strong{font-size:14.5px!important}
+.profile-button span:last-child{font-size:13.5px!important}
 
 /* Chat */
 .panel-title strong{font-size:14px!important}
 .panel-title small,
 .message-meta,
-.message-source{font-size:10px!important}
+.message-source{font-size:12.5px!important}
 .message-bubble>p,
-.model-answer>p{font-size:13px!important;line-height:1.6}
+.model-answer>p{font-size:14.5px!important;line-height:1.6}
 .analyst-banner strong,
 .thinking-trace strong,
-.context-picker strong{font-size:11px!important}
+.context-picker strong{font-size:13.5px!important}
 .quick-prompts>span,
 .quick-prompts button,
 .composer-actions,
 .composer-actions button,
 .attached-sources strong,
-.message-attachments span{font-size:10px!important}
+.message-attachments span{font-size:12.5px!important}
 .loss-table>div,
 .housing-row,
-.citation{font-size:10px!important}
+.citation{font-size:12.5px!important}
 
 /* Map and workflow */
-.right-view-tabs>button{font-size:11px!important}
+.right-view-tabs>button{font-size:13.5px!important}
 .workflow-toolbar strong,
-.workflow-inspector h3{font-size:13px!important}
+.workflow-inspector h3{font-size:14.5px!important}
 .workflow-node strong,
 .agent-log header strong,
-.approval-card strong{font-size:11px!important}
+.approval-card strong{font-size:13.5px!important}
 .workflow-node small,
 .node-step,
 .feedback-label,
 .stage-navigation button,
 .stage-navigation>span,
-.log-stream>div{font-size:9px!important}
+.log-stream>div{font-size:12px!important}
 .workflow-inspector>p,
 .node-source strong,
 .validation-list span,
-.review-checks span{font-size:10px!important}
+.review-checks span{font-size:12.5px!important}
 .map-toolbar button,
 .asset-inspector,
 .layer-menu label,
-.ask-location{font-size:11px!important}
+.ask-location{font-size:13.5px!important}
 
 /* Portfolio */
 .portfolio-header h1,
@@ -74,36 +74,36 @@
 .cluster-cards header strong,
 .detail-title strong,
 .loss-kpis strong,
-.context-grid strong{font-size:11px!important}
+.context-grid strong{font-size:13.5px!important}
 .property-list-main>small,
 .property-row-metrics b,
 .property-drawer header p,
 .hazard-table>div,
 .explanation>p,
-.portfolio-method-note p{font-size:10px!important}
+.portfolio-method-note p{font-size:12.5px!important}
 .property-drawer>header>div:first-child>span,
 .property-badges span,
 .detail-title small,
 .subsection-label,
-.provenance span{font-size:9px!important}
+.provenance span{font-size:12px!important}
 
 /* Data source library */
-.data-sources-header p{font-size:12px!important}
+.data-sources-header p{font-size:13.5px!important}
 .source-summary small,
 .source-dropzone p,
 .source-dropzone p button,
 .source-library-toolbar>div span,
 .source-table-head,
 .source-row,
-.source-name small{font-size:10px!important}
+.source-name small{font-size:12.5px!important}
 .source-name strong,
-.source-dropzone strong{font-size:12px!important}
+.source-dropzone strong{font-size:13.5px!important}
 .file-type,
-.source-status{font-size:9px!important}
+.source-status{font-size:12px!important}
 
 @media(max-width:760px){
-  .workspace{font-size:12px}
-  .workspace button,.workspace input,.workspace textarea,.workspace select{font-size:10px!important}
-  .workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) p{font-size:11px!important}
-  .workflow-node strong{font-size:9px!important}
+  .workspace{font-size:13.5px}
+  .workspace button,.workspace input,.workspace textarea,.workspace select{font-size:12.5px!important}
+  .workspace :is(.chat-panel,.right-pane,.portfolio-screen,.data-sources-screen) p{font-size:13.5px!important}
+  .workflow-node strong{font-size:12px!important}
 }

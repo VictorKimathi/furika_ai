@@ -1,0 +1,2 @@
+loc_id,name,region,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes,tiv_kes,synthetic
+NBO-EXAMPLE-001,Example insured property,Westlands,-1.2670,36.8030,concrete_rcc,100,100000,10000000,TRUE

@@ -25,6 +25,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     RESTX_VALIDATE = True
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     RESTX_MASK_SWAGGER = False
     RESTX_ERROR_404_HELP = False
     CORS_ORIGINS = [

@@ -10,7 +10,8 @@ from sqlalchemy import func
 
 from ..extensions import db
 from ..models import DocumentChunk, DocumentFact, HazardResult, Hotspot, LossResult, ModelRun, Portfolio, Property, RunStage, Upload, UploadRow
-from . import chat_provider, model_runs, run_metrics
+from . import chat_provider, model_runs, offer, run_metrics
+from .run_trace import RunFailed
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,8 @@ def _run_label(run: ModelRun) -> str:
 
 
 MODEL_QUESTION = re.compile(r"loss|aal|annual|damage|risk|exposure|exposed|flood|probab|return period|1-in|ep curve|exceed|scenario|model|run|report|underwrit|premium|accumulat", re.I)
+PORTFOLIO_COMPARISON = re.compile(r"\b(?:accumulat\w*|portfolio comparison|compare with (?:the )?portfolio|nearby insured (?:assets|properties))\b", re.I)
+MAX_OFFER_CONTEXT_CHARS = 120_000
 
 
 def ensure_run(portfolio_id: str, question: str) -> tuple[ModelRun | None, bool, str | None]:
@@ -97,6 +100,9 @@ def ensure_run(portfolio_id: str, question: str) -> tuple[ModelRun | None, bool,
         created = model_runs.create({"portfolioId": portfolio_id})
     except model_runs.RunError as exc:
         return None, False, str(exc)
+    except RunFailed as exc:  # logged with its trace by the run; the chat still answers
+        db.session.rollback()
+        return None, False, f"{exc} (trace {exc.trace.id})"
     return db.session.get(ModelRun, created["id"]), True, None
 
 
@@ -180,6 +186,32 @@ def respond(payload: dict) -> dict:
     upload_ids = context.get("uploadIds") or []
     if not isinstance(upload_ids, list) or any(not isinstance(item, str) for item in upload_ids):
         raise ChatError("context.uploadIds must be a list of source IDs.")
+    if context.get("offerText") and context.get("offerUploadId"):
+        raise ChatError("Select one offer context, not both pasted text and an uploaded offer.")
+    if offer.is_offer(question):
+        return _respond_to_offer(question, portfolio_id)
+    if context.get("offerText"):
+        offer_text = context["offerText"]
+        if not isinstance(offer_text, str) or len(offer_text) > MAX_OFFER_CONTEXT_CHARS or not offer.is_offer(offer_text):
+            raise ChatError("The carried offer context is invalid or too long; select the offer again.")
+        if upload_ids:
+            raise ChatError("A carried offer cannot be mixed with other selected data sources. Clear the offer first.")
+        return _respond_to_offer(offer_text, portfolio_id, question=question,
+                                 include_portfolio_comparison=bool(PORTFOLIO_COMPARISON.search(question)))
+    if context.get("offerUploadId"):
+        if upload_ids and upload_ids != [context["offerUploadId"]]:
+            raise ChatError("A carried offer cannot be mixed with other selected data sources. Clear the offer first.")
+        upload, document_text = _offer_document(portfolio_id, context["offerUploadId"])
+        return _respond_to_offer(document_text, portfolio_id, source_upload=upload, question=question,
+                                 include_portfolio_comparison=bool(PORTFOLIO_COMPARISON.search(question)))
+    if len(upload_ids) == 1:
+        upload = Upload.query.filter_by(id=upload_ids[0], portfolio_id=portfolio_id).first()
+        if upload and upload.extractor in ("pdf", "docx", "text"):
+            chunks = DocumentChunk.query.filter_by(upload_id=upload.id).order_by(DocumentChunk.chunk_index).limit(200).all()
+            document_text = "\n".join(chunk.text for chunk in chunks)[:120000]
+            if offer.is_offer(document_text):
+                return _respond_to_offer(document_text, portfolio_id, upload, question=question,
+                                         include_portfolio_comparison=bool(PORTFOLIO_COMPARISON.search(question)))
     run, run_created, run_problem = ensure_run(portfolio_id, question)
     evidence, citations, has_source_content = _evidence(portfolio_id, upload_ids, question, context.get("propertyId"), context.get("hotspotId"))
     stage = context.get("stage")
@@ -213,6 +245,49 @@ def respond(payload: dict) -> dict:
     return {"answer": answer, "source": ", ".join(upload.filename for upload in selected_uploads(upload_ids)) or "Portfolio and workflow database", "citations": _dedupe(citations)[:20], "actions": actions, "workflow": workflow, "provider": provider, "model": model, "dummy": False}
 
 
+def _offer_document(portfolio_id: str, upload_id: str) -> tuple[Upload, str]:
+    if not isinstance(upload_id, str):
+        raise ChatError("context.offerUploadId must be an uploaded document ID.")
+    upload = Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first()
+    if upload is None:
+        raise ChatError("The selected offer was not found in this portfolio.", 404)
+    if upload.extractor not in ("pdf", "docx", "text"):
+        raise ChatError("The selected source is not an offer document.")
+    chunks = DocumentChunk.query.filter_by(upload_id=upload.id).order_by(DocumentChunk.chunk_index).limit(200).all()
+    document_text = "\n".join(chunk.text for chunk in chunks)[:MAX_OFFER_CONTEXT_CHARS]
+    if not offer.is_offer(document_text):
+        raise ChatError("The selected document has no processed placement offer to review.", 422)
+    return upload, document_text
+
+
+def _respond_to_offer(text: str, portfolio_id: str, source_upload: Upload | None = None, *, question: str | None = None,
+                      include_portfolio_comparison: bool = False) -> dict:
+    """A pasted placement offer: score it with the model, then have the AI write the briefing from those results."""
+    if db.session.get(Portfolio, portfolio_id) is None:
+        raise ChatError(f"Portfolio {portfolio_id} was not found.", 404)
+    analysis = offer.analyse(text, portfolio_id, include_portfolio_comparison=include_portfolio_comparison)
+    checks = offer.stage_report(analysis)
+    answer = offer.briefing(analysis)
+    try:
+        commentary, provider, model = chat_provider.answer(offer.prompt(analysis, question))
+        answer += f"\n\n## Additional AI interpretation\n{commentary}"
+    except chat_provider.ChatProviderError as exc:
+        logger.warning("Chat providers failed on an offer: %s", exc)
+        provider, model = "none", "none"
+    coords = (analysis["facts"].get("coordinates") or {}).get("value")
+    accumulation = analysis.get("accumulation") or {}
+    citations = [{"uploadId": source_upload.id, "filename": source_upload.filename} if source_upload else {"offer": (analysis["facts"].get("reference") or {}).get("value") or "pasted offer"}]
+    if accumulation.get("runId"):
+        citations.append({"runId": accumulation["runId"]})
+    model_view = analysis.get("model") or {}
+    asset = {"kind": "offer", "name": (analysis["facts"].get("client") or {}).get("value") or "Pasted offer", "lat": coords["lat"], "lng": coords["lon"],
+             "annualFloodProbability": model_view.get("annualFloodProbability"), "aalKes": model_view.get("aalKes"), "loss100Kes": model_view.get("loss100Kes"),
+             "flags": analysis["flags"]} if coords else None
+    source_name = source_upload.filename if source_upload else "Pasted placement offer"
+    return {"answer": answer, "asset": asset, "source": f"{source_name} (contact details redacted)", "citations": citations, "actions": [],
+            "workflow": None, "offerChecks": checks, "provider": provider, "model": model, "dummy": False}
+
+
 def _dedupe(citations: list[dict]) -> list[dict]:
     seen, unique = set(), []
     for citation in citations:
@@ -231,6 +306,8 @@ def _short_reason(errors: str) -> str:
         reasons.append("Claude is not reachable or not configured")
     if "Gemini" in errors:
         reasons.append("Gemini failed or is not configured")
+    if "OpenAI" in errors:
+        reasons.append("OpenAI failed or is not configured")
     return "; ".join(reasons) or "provider error"
 
 

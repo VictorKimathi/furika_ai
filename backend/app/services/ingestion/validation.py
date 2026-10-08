@@ -20,7 +20,9 @@ NUMERIC_FIELDS = ("lat", "lon", "floor_area_m2", "cost_per_m2_kes", "tiv_kes", *
 CANONICAL_FIELDS = ("loc_id", "lat", "lon", "housing_class", "floor_area_m2", "cost_per_m2_kes", "tiv_kes", *HAZARD_FIELDS, "name", "region", "address", "synthetic")
 TIV_TOLERANCE = 0.02
 
-UNSUPPORTED_CONSTRUCTION = re.compile(r"rcc|reinforced|concrete|high[\s_-]?rise|steel", re.IGNORECASE)
+RCC_ALIASES = re.compile(r"\brcc\b|reinforced[\s_-]*concrete|\bconcrete\b", re.IGNORECASE)
+TALL_OR_BASEMENT = re.compile(r"high[\s_-]?rise|tower|basement", re.IGNORECASE)
+UNSUPPORTED_CONSTRUCTION = re.compile(r"steel|high[\s_-]?rise", re.IGNORECASE)
 TRUE_VALUES = {"true", "t", "yes", "y", "1"}
 SEVERITY_STATUS = (("error", "rejected"), ("review", "needs_review"), ("warning", "accepted_with_warnings"))
 PROMOTABLE_STATUSES = {"accepted", "accepted_with_warnings"}
@@ -102,6 +104,15 @@ def check_row(raw: dict[str, str | None]) -> tuple[dict, list[dict], dict[str, d
         normalised = re.sub(r"[\s\-]+", "_", housing_class.strip().lower())
         if normalised in fm.VALID_CLASSES:
             data["housing_class"] = normalised
+        elif RCC_ALIASES.search(housing_class):
+            data["housing_class"] = "concrete_rcc"
+            issues.append(issue("class_mapped", "info", f"'{housing_class}' is modelled as concrete_rcc.", "housing_class", {"value": housing_class}))
+            if TALL_OR_BASEMENT.search(housing_class):
+                issues.append(issue(
+                    "basement_not_modelled", "warning",
+                    f"'{housing_class}': high-rise and basement exposure (plant rooms, generators, pumps) is not modelled separately; losses may be understated.",
+                    "housing_class", {"value": housing_class},
+                ))
         elif UNSUPPORTED_CONSTRUCTION.search(housing_class):
             issues.append(issue(
                 "unsupported_construction", "review",

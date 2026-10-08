@@ -46,6 +46,30 @@ def codes(item):
     return {issue["code"] for issue in item["issues"]}
 
 
+def test_accumulation_merges_and_filters_multiple_asset_uploads(client):
+    columns = "loc_id,name,region,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes,tiv_kes,synthetic"
+    first = post(client, "\n".join([columns,
+        "NBO-ACC-001,Asset one,Westlands,-1.2670,36.8030,concrete_rcc,100,100000,10000000,TRUE",
+        "NBO-ACC-002,Asset two,Westlands,-1.2680,36.8040,concrete_rcc,50,100000,5000000,TRUE",
+    ]), filename="first-assets.csv")
+    second = post(client, "\n".join([columns,
+        "NBO-ACC-003,Asset three,Mathare,-1.2576,36.8962,semi_permanent,33,10000,330000,TRUE",
+    ]), filename="second-assets.csv")
+    assert first.status_code == 201, first.json
+    assert second.status_code == 201, second.json
+    base = f"/api/v1/portfolios/{PORTFOLIO}"
+    all_regions = client.get(f"{base}/clusters?type=neighbourhood").json["items"]
+    assert sum(region["propertyCount"] for region in all_regions) == 3
+    assert {region["name"] for region in all_regions} == {"Westlands", "Mathare"}
+    for upload, count in ((first, 2), (second, 1)):
+        upload_id = upload.json["id"]
+        properties = client.get(f"{base}/properties?uploadId={upload_id}")
+        regions = client.get(f"{base}/clusters?uploadId={upload_id}")
+        assert properties.json["total"] == count
+        assert sum(region["propertyCount"] for region in regions.json["items"]) == count
+        assert all(region["geocodedCount"] == region["propertyCount"] for region in regions.json["items"])
+
+
 def test_exact_csv_is_stored_and_promoted(client, app):
     content = "\n".join([HEADER, row(), row(loc_id="NBO-T-002", lat="-1.2600")]) + "\n"
     response = post(client, content)
@@ -113,7 +137,7 @@ def test_row_level_errors_are_coded(client):
         row(loc_id="D", scores="0.45,0.40,0.34,0.24,1.7"),
         row(loc_id="E"),
         row(loc_id="E"),
-        row(loc_id="F", housing_class="RCC high-rise"),
+        row(loc_id="F", housing_class="Steel frame"),
         row(loc_id="G", tiv="900000"),
     ]) + "\n"
     body = post(client, content).json

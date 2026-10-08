@@ -67,19 +67,22 @@ import './data-sources.css';
 import './readability.css';
 import './brand.css';
 import kenyaReLogo from './assets/kenya-re-logo-light.png';
+import kenyaReReportLogo from './assets/kenya-re-logo-light.png?inline';
 import FurikaMascot from './FurikaMascot.jsx';
 import PortfolioScreen from './PortfolioScreen.jsx';
-import { API_BASE_URL as BACKEND_URL, PORTFOLIO_ID, apiGet, apiRequest } from './api.js';
+import AccumulationScreen from './AccumulationScreen.jsx';
+import { API_BASE_URL as BACKEND_URL, PORTFOLIO_ID, apiGet, apiRequest, describeError, log } from './api.js';
 import FormattedText from './FormattedText.jsx';
+import OfferChecks from './OfferChecks.jsx';
 import StageDrawer from './StageMetrics.jsx';
 
 // Scenario tiers on the map: common (rarest flood, widest footprint) in blue through to severe in red.
 const TIERS = [
-  { id: 'common', label: 'Common', range: '1 in 250', color: '#2a78d6' },
-  { id: 'occasional', label: 'Occasional', range: '1 in 100', color: '#1baf7a' },
-  { id: 'moderate', label: 'Moderate', range: '1 in 50', color: '#eda100' },
-  { id: 'severe', label: 'Severe', range: '1 in 25', color: '#e34948' },
-  { id: 'extreme', label: 'Extreme', range: '1 in 10', color: '#a3123f' },
+  { id: 'common', label: 'Common', range: '1 in 250', color: '#2a78d6', rain: 1 },
+  { id: 'occasional', label: 'Occasional', range: '1 in 100', color: '#1baf7a', rain: .8 },
+  { id: 'moderate', label: 'Moderate', range: '1 in 50', color: '#eda100', rain: .62 },
+  { id: 'severe', label: 'Severe', range: '1 in 25', color: '#e34948', rain: .46 },
+  { id: 'extreme', label: 'Extreme', range: '1 in 10', color: '#a3123f', rain: .32 },
 ];
 
 const HOTSPOTS = [
@@ -226,29 +229,43 @@ function ExposurePreview({ asset, onConfirm, onCancel }) {
 const THINKING_STAGES = [
   { title: 'Understanding the request', detail: 'Classifying the underwriting question' },
   { title: 'Retrieving model evidence', detail: 'Loading approved sources and portfolio context' },
-  { title: 'Running model checks', detail: 'Validating assumptions, units and monotonicity' },
+  { title: 'Running available checks', detail: 'Applying site model and underwriting rules where data permits' },
   { title: 'Preparing the response', detail: 'Formatting evidence for an underwriter' },
 ];
 
 const INITIAL_CHAT_MESSAGE = { role: 'assistant', content: "Hi, I'm **Furi**, the Furika Bot. Ask me about your portfolio, a property's flood risk or losses, or attach a file from the Data store with **Add context**." };
 
-function ThinkingTrace({ activeStep, onOpenWorkflow }) {
-  return <div className="thinking-trace"><header><div><span className="thinking-orb"><Sparkles size={14}/></span><span><strong>Furika AI is working</strong><small>Auditable activity · no hidden reasoning shown</small></span></div><button onClick={() => onOpenWorkflow('workflow', true)}><Workflow size={13}/> See activity</button></header><div className="thinking-stages">{THINKING_STAGES.map((stage,index)=>{const state=index<activeStep?'done':index===activeStep?'active':'waiting';return <div className={state} key={stage.title}><i>{state==='done'?<Check size={11}/>:state==='active'?<span/>:index+1}</i><span><strong>{stage.title}</strong><small>{stage.detail}</small></span></div>})}</div></div>;
+function ThinkingTrace({ activeStep }) {
+  return <div className="thinking-trace"><header><div><span className="thinking-orb"><Sparkles size={14}/></span><span><strong>Furika AI is working</strong><small>Calculated checks and any blocked steps will appear in the response</small></span></div></header><div className="thinking-stages">{THINKING_STAGES.map((stage,index)=>{const state=index<activeStep?'done':index===activeStep?'active':'waiting';return <div className={state} key={stage.title}><i>{state==='done'?<Check size={11}/>:state==='active'?<span/>:index+1}</i><span><strong>{stage.title}</strong><small>{stage.detail}</small></span></div>})}</div></div>;
 }
 
 function citationLabel(citation) {
-  const name = citation.filename || citation.propertyId || citation.runId || citation.name || citation.portfolioId;
+  const name = citation.filename || citation.propertyId || citation.runId || citation.name || citation.portfolioId || citation.offer;
   if (citation.page) return `${name} p.${citation.page}`;
   if (citation.rowRef) return /^\d/.test(citation.rowRef) ? `${name} row ${citation.rowRef}` : `${name} · ${citation.rowRef}`;
   return name;
 }
 
-function ResponseActions({ reportReady, onOpenView, workflow, onReviewRun }) {
+function ResponseActions({ message, reportReady, onOpenView, workflow, onReviewRun, offerChecks }) {
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState('');
   const pending = workflow?.status === 'review';
-  return <div className="response-actions">{reportReady && <span><CheckCircle2 size={13}/> Report ready</span>}{pending ? <button className="review-run" onClick={() => onReviewRun(workflow)}><ShieldCheck size={13}/> Review & approve {workflow.runId}</button> : <button onClick={()=>onOpenView('workflow', !reportReady)}><Workflow size={13}/> View workflow</button>}<button onClick={()=>onOpenView('map')}><Map size={13}/> Open map</button></div>;
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    setPdfError('');
+    try {
+      const { downloadChatReportPdf } = await import('./chatReportPdf.js');
+      downloadChatReportPdf(message, { logoDataUrl: kenyaReReportLogo, portfolioId: PORTFOLIO_ID, generatedAt: message.createdAt || new Date() });
+    } catch (error) { setPdfError(error.message || 'Could not create the PDF report.'); }
+    finally { setPdfBusy(false); }
+  };
+  return <>
+    <div className="response-actions">{offerChecks ? <span><ShieldCheck size={13}/> Offer checks shown above · human review required</span> : <>{reportReady && <span><CheckCircle2 size={13}/> Report ready</span>}{pending ? <button className="review-run" onClick={() => onReviewRun(workflow)}><ShieldCheck size={13}/> Review & approve {workflow.runId}</button> : <button onClick={()=>onOpenView('workflow', !reportReady)}><Workflow size={13}/> View workflow</button>}</>}<button onClick={()=>onOpenView('map')}><Map size={13}/> Open map</button><button type="button" onClick={downloadPdf} disabled={pdfBusy} title="Download this answer as a Kenya Re PDF report"><Download size={13}/>{pdfBusy ? 'Preparing PDF…' : 'Download PDF'}</button></div>
+    {pdfError && <small className="response-pdf-error" role="alert">{pdfError}</small>}
+  </>;
 }
 
-function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWorkflowPending, reportReady, portfolioSummary, dataSources, onUploadFiles, attested, setAttested }) {
+function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWorkflowPending, onOfferLocation, reportReady, portfolioSummary, dataSources, onUploadFiles, attested, setAttested }) {
   const [messages, setMessages] = useState([INITIAL_CHAT_MESSAGE]);
   const [activeChatId, setActiveChatId] = useState(() => `chat-${Date.now()}`);
   const [recentChats, setRecentChats] = useState(() => {
@@ -331,8 +348,9 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     try {
       const data = await apiRequest('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis', context }) });
       await completeThinking();
-      setMessages((current) => [...current, { role: 'assistant', content: data.answer, source: data.source || 'Furika model context', citations: data.citations || [], workflow: data.workflow || null, provider: data.provider, actions: true }]);
+      setMessages((current) => [...current, { role: 'assistant', content: data.answer, question: text, reportAttachments: selectedSources.map((source) => source.name), createdAt: new Date().toISOString(), source: data.source || 'Furika model context', citations: data.citations || [], workflow: data.workflow || null, offerChecks: data.offerChecks || null, provider: data.provider, model: data.model, actions: true }]);
       if (data.workflow?.status === 'review') onWorkflowPending(data.workflow);
+      if (data.asset?.kind === 'offer' && data.asset.lat != null) onOfferLocation?.(data.asset);
     } catch (error) {
       await completeThinking();
       setMessages((current) => [...current, { role: 'assistant', content: error.message, source: 'Flask backend' }]);
@@ -387,10 +405,10 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
       <div className="analyst-banner"><Sparkles size={15} /><div><strong>{portfolioSummary?.status === 'approved' ? 'Approved portfolio results available' : 'Dataset-grounded analyst'}</strong><span>Select a data source to ask about its uploaded contents.</span></div></div>
       {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
         <div className="message-meta">{message.role === 'assistant' ? <span className="bot-meta"><FurikaMascot size={16}/> FURIKA BOT</span> : 'DR. A. OMONDI'} <span>· just now</span></div>
-        <div className="message-bubble">{message.role === 'assistant' ? <FormattedText text={message.content}/> : <p>{message.content}</p>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.source && <small className="message-source"><FileText size={11} /> {message.source}{message.citations?.length > 0 && ` · ${[...new Set(message.citations.map(citationLabel))].filter((label) => label !== message.source).slice(0, 4).join(', ')}`}</small>}{message.actions && <ResponseActions reportReady={reportReady} onOpenView={onOpenView} workflow={message.workflow} onReviewRun={onWorkflowPending}/>}</div>
+        <div className="message-bubble">{message.role === 'assistant' ? <FormattedText text={message.content}/> : <p>{message.content}</p>}{message.offerChecks && <OfferChecks report={message.offerChecks}/>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.source && <small className="message-source"><FileText size={11} /> {message.source}{message.citations?.length > 0 && ` · ${[...new Set(message.citations.map(citationLabel))].filter((label) => label !== message.source).slice(0, 4).join(', ')}`}</small>}{message.actions && <ResponseActions message={{ ...message, question: message.question || (message.summary ? null : messages.slice(0, index).reverse().find((item) => item.role === 'user')?.content), reportAttachments: message.reportAttachments || messages[index - 1]?.attachments }} reportReady={reportReady} onOpenView={onOpenView} workflow={message.workflow} onReviewRun={onWorkflowPending} offerChecks={message.offerChecks}/>}</div>
       </div>)}
       {preview && <ExposurePreview asset={preview} onConfirm={confirmAsset} onCancel={() => setPreview(null)} />}
-      {busy && <ThinkingTrace activeStep={thinkingStep} onOpenWorkflow={onOpenView}/>} 
+      {busy && <ThinkingTrace activeStep={thinkingStep}/>}
       {!!addedAssets.length && <div className="portfolio-update"><Database size={14} /> {addedAssets.length} AI-derived synthetic {addedAssets.length === 1 ? 'asset' : 'assets'} added this session</div>}
     </div>
     <div className="quick-prompts"><span>QUICK QUERIES</span>{['Explain the EP curve','Compare Kibera and Mathare','Show model limitations'].map((q) => <button key={q} onClick={() => submit(q)}>{q}</button>)}</div>
@@ -457,6 +475,18 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
     return () => { active = false; };
   }, [reloadSignal]);
 
+  const clock = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
+  // Backend step trace as log lines: every step with its time, and the failing step with the error.
+  const traceLines = (trace) => (trace?.steps || []).map((step) => {
+    const detail = Object.entries(step.detail || {}).map(([key, value]) => `${key}=${value}`).join(', ');
+    return { time: clock(), tone: step.status === 'ok' ? 'info' : 'warning',
+      text: `${step.status === 'ok' ? 'ok' : step.status.toUpperCase()} · ${step.step} · ${step.ms ?? '-'} ms${detail ? ` · ${detail}` : ''}${step.error ? ` · ${step.error}` : ''}` };
+  });
+  const failureLines = (error, action) => [
+    { time: clock(), tone: 'warning', text: `${action} failed${error.step ? ` at step "${error.step}"` : ''}: ${error.message}` },
+    ...traceLines(error.trace),
+    { time: clock(), tone: 'info', text: `Trace ${error.requestId || 'n/a'}: search the Flask log for this ID; window.furikaLog in the browser console has the full record.` },
+  ];
   const addLog = (tone, text) => setLogs((items) => [...items, { time: new Date().toLocaleTimeString('en-GB', { hour12: false }), tone, text }]);
   const startRun = async () => {
     if (running) return;
@@ -470,10 +500,11 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
       setRunSummary(run.configuration?.summary || null);
       setCompleted(WORKFLOW_NODES.filter((node) => !['review', 'publish'].includes(node.id)).map((node) => node.id));
       setCurrent('review'); setSelectedId('review'); setAwaitingApproval(true);
-      setLogs((items) => [...items, { time: new Date().toLocaleTimeString('en-GB', { hour12: false }), tone: 'success', text: `${run.configuration?.summary?.propertyCount || 0} confirmed properties calculated in run ${run.id}.` }, { time: new Date().toLocaleTimeString('en-GB', { hour12: false }), tone: 'warning', text: 'Review the calculated summary before approval.' }]);
+      setLogs((items) => [...items, ...traceLines(run.trace), { time: clock(), tone: 'success', text: `${run.configuration?.summary?.propertyCount || 0} confirmed properties calculated in run ${run.id} (${run.trace?.totalMs ?? '?'} ms, trace ${run.trace?.traceId || 'n/a'}).` }, { time: clock(), tone: 'warning', text: 'Review the calculated summary before approval.' }]);
     } catch (error) {
       setCurrent(null);
-      addLog('warning', error.message);
+      log.error('Workflow run failed', { step: error.step, requestId: error.requestId, message: error.message });
+      setLogs((items) => [...items, ...failureLines(error, 'Model run')]);
     } finally { setRunning(false); }
   };
 
@@ -491,12 +522,16 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
     if (!runId) return;
     setRunning(true);
     try {
-      await apiRequest(`/model-runs/${runId}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      const decision = await apiRequest(`/model-runs/${runId}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      setLogs((items) => [...items, ...traceLines(decision.trace)]);
       setAwaitingApproval(false); setCurrent(null);
       setRunStatus(action === 'approve' ? 'approved' : 'revision_requested');
       if (action === 'approve') { setCompleted(WORKFLOW_NODES.map((node) => node.id)); onApproved(); addLog('success', `Run ${runId} approved and property results saved.`); }
       else { addLog('warning', `Run ${runId} returned for revision.`); }
-    } catch (error) { addLog('warning', error.message); }
+    } catch (error) {
+      log.error(`Workflow ${action} failed`, { step: error.step, requestId: error.requestId, message: error.message });
+      setLogs((items) => [...items, ...failureLines(error, action === 'approve' ? 'Approval' : 'Return')]);
+    }
     finally { setRunning(false); }
   };
 
@@ -545,6 +580,56 @@ const distanceKm = (a, b) => {
   return 12742 * Math.asin(Math.sqrt(h));
 };
 
+const HOUSING_NAMES = { informal_iron_sheet: 'Informal iron sheet', semi_permanent: 'Semi-permanent', permanent_masonry: 'Permanent masonry', concrete_rcc: 'Concrete / RCC' };
+const kes = (value) => value == null ? 'n/a' : value >= 1e9 ? `KES ${(value / 1e9).toFixed(2)}B` : `KES ${(value / 1e6).toFixed(1)}M`;
+const coord = (lat, lng) => `${Math.abs(lat).toFixed(5)}°${lat < 0 ? 'S' : 'N'}, ${Math.abs(lng).toFixed(5)}°${lng < 0 ? 'W' : 'E'}`;
+
+// Hover card for map markers: exact location plus what the portfolio knows about the point.
+function MapTooltip({ hover, tier, assets }) {
+  if (!hover) return null;
+  const { kind, data, x, y } = hover;
+  const rows = [];
+  let title = data.name, type = 'PORTFOLIO PROPERTY';
+  if (kind === 'asset') {
+    title = data.name || data.id;
+    if (data.region) rows.push(['Area', data.region]);
+    rows.push(['Construction', HOUSING_NAMES[data.type] || data.type || 'n/a'], ['Insured value', kes(data.insuredValueKes)],
+      [`${tier.label} score`, data.hazardScores?.[tier.id] == null ? 'n/a' : Number(data.hazardScores[tier.id]).toFixed(2)],
+      ['Annual flood chance', data.annualFloodProbability == null ? 'Pending run' : `${(data.annualFloodProbability * 100).toFixed(1)}%`],
+      ['1-in-100 loss', data.loss100Kes == null ? 'Pending run' : kes(data.loss100Kes)], ['Average annual loss', data.aalKes == null ? 'Pending run' : kes(data.aalKes)]);
+    if (data.nearestHotspotKm != null) rows.push(['Nearest hotspot', `${Number(data.nearestHotspotKm).toFixed(2)} km`]);
+    rows.push(['Status', data.reviewStatus === 'unconfirmed' ? 'Unconfirmed' : 'Confirmed' + (data.geocodePrecision ? ` · ${data.geocodePrecision} location` : '')]);
+  } else if (kind === 'hotspot') {
+    type = 'DOCUMENTED FLOOD HOTSPOT';
+    const point = { lat: data.latitude, lng: data.longitude };
+    const near = assets.map((asset) => ({ asset, km: distanceKm(point, asset) })).sort((a, b) => a.km - b.km);
+    const within = near.filter((item) => item.km <= 1);
+    if (data.severity) rows.push(['Severity', data.severity]);
+    rows.push(['Properties within 1 km', String(within.length)], ['Insured value within 1 km', kes(within.reduce((sum, item) => sum + (item.asset.insuredValueKes || 0), 0))],
+      [`Wet in ${tier.label.toLowerCase()} scenario`, `${within.filter((item) => item.asset.score > 0).length} of ${within.length}`]);
+    if (near[0]) rows.push(['Nearest property', `${near[0].asset.name || near[0].asset.id} · ${near[0].km.toFixed(2)} km`]);
+  } else if (kind === 'offer') {
+    type = 'PASTED PLACEMENT OFFER';
+    const near = assets.filter((asset) => distanceKm(data, asset) <= 1);
+    rows.push(['Annual flood chance', data.annualFloodProbability == null ? 'n/a' : `${(data.annualFloodProbability * 100).toFixed(1)}%`],
+      ['Average annual loss', kes(data.aalKes)], ['1-in-100 loss', kes(data.loss100Kes)],
+      ['Portfolio within 1 km', `${near.length} properties · ${kes(near.reduce((sum, asset) => sum + (asset.insuredValueKes || 0), 0))}`]);
+    (data.flags || []).filter((flag) => flag.severity === 'high').slice(0, 3).forEach((flag, index) => rows.push([index ? '' : 'High findings', flag.title]));
+  } else {
+    type = 'FLOOD CLUSTER';
+    rows.push(['Properties', String(data.count)], ['Insured value', `KES ${data.value.toFixed(1)}M`], [`Mean ${tier.label.toLowerCase()} score`, data.meanScore.toFixed(2)]);
+  }
+  const lat = kind === 'hotspot' ? data.latitude : data.lat, lng = kind === 'hotspot' ? data.longitude : data.lng;
+  const flipX = x > hover.width - 300, flipY = y > hover.height - 260;
+  return <div className={`map-tooltip ${kind}`} style={{ left: x, top: y, transform: `translate(${flipX ? 'calc(-100% - 14px)' : '14px'}, ${flipY ? 'calc(-100% - 10px)' : '10px'})`, '--tier': tier.color }} role="tooltip">
+    <span className="map-tooltip-type">{type}</span>
+    <strong>{title}</strong>
+    <p><MapPin size={12}/> {coord(lat, lng)}</p>
+    <dl>{rows.map(([label, value], index) => <React.Fragment key={`${label}-${index}`}><dt>{label}</dt><dd>{value}</dd></React.Fragment>)}</dl>
+    <small>{kind === 'offer' ? 'Model view of the offered building · see the chat briefing' : 'Click for details · ask Furika Bot'}</small>
+  </div>;
+}
+
 function convexHull(points) {
   const sorted = [...points].sort((a, b) => a.lng - b.lng || a.lat - b.lat);
   const cross = (o, a, b) => (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng);
@@ -579,18 +664,95 @@ function buildFloodMesh(assets) {
   return { wet, edges, clusters };
 }
 
-function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, properties, hotspots, portfolioSummary }) {
+// Animated rain over flooded buildings. Intensity follows the scenario's flood size (rarer = larger flood = heavier rain),
+// and drops are concentrated where buildings are wet, weighted by their proxy score.
+function useRainLayer({ canvasRef, mapRef, ready, enabled, wet, intensity }) {
+  useEffect(() => {
+    const maps = window.google?.maps;
+    const canvas = canvasRef.current;
+    if (!ready || !enabled || !maps || !mapRef.current || !canvas) return undefined;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const context = canvas.getContext('2d');
+    const probe = new maps.OverlayView();
+    probe.onAdd = () => {}; probe.draw = () => {}; probe.onRemove = () => {};
+    probe.setMap(mapRef.current);
+    let cells = [], drops = [], splashes = [], frame = 0, width = 0, height = 0;
+    const resize = () => {
+      const ratio = window.devicePixelRatio || 1;
+      width = canvas.clientWidth; height = canvas.clientHeight;
+      canvas.width = width * ratio; canvas.height = height * ratio;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    };
+    const project = () => {
+      const projection = probe.getProjection();
+      if (!projection) return;
+      cells = wet.map((asset) => {
+        const point = projection.fromLatLngToContainerPixel(new maps.LatLng(asset.lat, asset.lng));
+        return point && { x: point.x, y: point.y, r: 18 + asset.score * 34, weight: .25 + asset.score };
+      }).filter((cell) => cell && cell.x > -60 && cell.y > -60 && cell.x < width + 60 && cell.y < height + 60);
+    };
+    const totalWeight = () => cells.reduce((sum, cell) => sum + cell.weight, 0) || 1;
+    const spawn = (local) => {
+      let x, y;
+      if (local && cells.length) {
+        let pick = Math.random() * totalWeight(), cell = cells[0];
+        for (const item of cells) { pick -= item.weight; if (pick <= 0) { cell = item; break; } }
+        const angle = Math.random() * Math.PI * 2, distance = Math.sqrt(Math.random()) * cell.r;
+        x = cell.x + Math.cos(angle) * distance; y = cell.y + Math.sin(angle) * distance - 40 - Math.random() * 30;
+        return { x, y, end: y + 40 + Math.random() * 30, speed: 7 + intensity * 7 + Math.random() * 3, length: 8 + intensity * 10, local: true };
+      }
+      x = Math.random() * width; y = -20 - Math.random() * height * .3;
+      return { x, y, end: height + 20, speed: 6 + intensity * 6, length: 6 + intensity * 8, local: false };
+    };
+    const tick = () => {
+      context.clearRect(0, 0, width, height);
+      const localTarget = Math.min(900, Math.round(totalWeight() * 6 * intensity));
+      const backgroundTarget = Math.round(width * height / 9000 * intensity);
+      const localCount = drops.filter((drop) => drop.local).length;
+      for (let i = localCount; i < localTarget; i += 1) drops.push(spawn(true));
+      for (let i = drops.length - localCount; i < backgroundTarget; i += 1) drops.push(spawn(false));
+      context.lineCap = 'round';
+      drops = drops.filter((drop) => {
+        drop.y += drop.speed; drop.x -= drop.speed * .18;
+        if (drop.y >= drop.end) { if (drop.local && splashes.length < 250) splashes.push({ x: drop.x, y: drop.end, r: 1, life: 1 }); return false; }
+        context.strokeStyle = drop.local ? `rgba(29, 92, 171, ${.35 + intensity * .4})` : `rgba(80, 120, 170, ${.12 + intensity * .15})`;
+        context.lineWidth = drop.local ? 1.4 : 1;
+        context.beginPath(); context.moveTo(drop.x, drop.y); context.lineTo(drop.x + drop.length * .18, drop.y - drop.length); context.stroke();
+        return true;
+      });
+      splashes = splashes.filter((splash) => {
+        splash.r += .9; splash.life -= .06;
+        if (splash.life <= 0) return false;
+        context.strokeStyle = `rgba(42, 120, 214, ${splash.life * .5})`; context.lineWidth = 1;
+        context.beginPath(); context.ellipse(splash.x, splash.y, splash.r * 1.6, splash.r * .6, 0, 0, Math.PI * 2); context.stroke();
+        return true;
+      });
+      frame = window.requestAnimationFrame(tick);
+    };
+    resize();
+    const listeners = [mapRef.current.addListener('bounds_changed', project), mapRef.current.addListener('idle', project)];
+    const observer = new ResizeObserver(() => { resize(); project(); });
+    observer.observe(canvas);
+    const start = window.setTimeout(() => { project(); frame = window.requestAnimationFrame(tick); }, 60);
+    return () => { window.clearTimeout(start); window.cancelAnimationFrame(frame); listeners.forEach((listener) => listener.remove()); observer.disconnect(); probe.setMap(null); context.clearRect(0, 0, width, height); };
+  }, [canvasRef, mapRef, ready, enabled, wet, intensity]);
+}
+
+function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, properties, hotspots, offer, portfolioSummary }) {
   const node = useRef(null);
   const mapRef = useRef(null);
   const overlaysRef = useRef([]);
   const pulseRef = useRef(null);
   const [mapStatus, setMapStatus] = useState('loading');
-  const [layers, setLayers] = useState({ hotspots: true, assets: true, mesh: true, pulse: true });
+  const [layers, setLayers] = useState({ hotspots: true, assets: true, mesh: true, pulse: true, rain: true });
+  const rainRef = useRef(null);
   const [layerMenu, setLayerMenu] = useState(false);
+  const [hover, setHover] = useState(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const currentTier = TIERS.find((tier) => tier.id === activeTier);
   const allAssets = useMemo(() => properties.filter((property) => property.latitude != null && property.longitude != null).map((property) => ({ ...property, lat: property.latitude, lng: property.longitude, value: property.insuredValueKes == null ? null : property.insuredValueKes / 1e6, score: Number(property.hazardScores?.[activeTier] ?? 0), loss: property.loss100Kes == null ? null : property.loss100Kes / 1e6, type: property.housingClass, status: property.reviewStatus === 'unconfirmed' ? 'Unconfirmed property' : 'Portfolio property' })), [properties, activeTier]);
   const mesh = useMemo(() => buildFloodMesh(allAssets), [allAssets]);
+  useRainLayer({ canvasRef: rainRef, mapRef, ready: mapStatus === 'ready', enabled: layers.rain, wet: mesh.wet, intensity: currentTier.rain });
 
   useEffect(() => {
     if (!apiKey) { setMapStatus('missing'); return undefined; }
@@ -603,6 +765,10 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
     return () => { cancelled = true; };
   }, [apiKey]);
 
+  useEffect(() => {  // a pasted offer: fly to the offered building
+    if (mapStatus === 'ready' && offer && mapRef.current) { mapRef.current.panTo({ lat: offer.lat, lng: offer.lng }); mapRef.current.setZoom(15); }
+  }, [mapStatus, offer]);
+
   useEffect(() => {
     const maps = window.google?.maps;
     if (!mapRef.current || !maps) return undefined;
@@ -610,10 +776,20 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
     overlaysRef.current = [];
     const add = (item) => { overlaysRef.current.push(item); return item; };
     const color = currentTier.color;
+    const hoverable = (item, kind, data) => {
+      item.addListener('mouseover', (event) => {
+        const box = node.current?.getBoundingClientRect();
+        if (!box || !event.domEvent) return;
+        setHover({ kind, data, x: event.domEvent.clientX - box.left, y: event.domEvent.clientY - box.top, width: box.width, height: box.height });
+      });
+      item.addListener('mouseout', () => setHover(null));
+      return item;
+    };
 
     if (layers.mesh) {
       mesh.clusters.forEach((cluster) => {
         const polygon = add(new maps.Polygon({ map: mapRef.current, paths: cluster.hull.map((p) => ({ lat: p.lat, lng: p.lng })), fillColor: color, fillOpacity: .12, strokeColor: color, strokeOpacity: .75, strokeWeight: 1.5, zIndex: 1 }));
+        hoverable(polygon, 'cluster', { name: `Flood cluster · ${cluster.members.length} properties`, lat: cluster.lat, lng: cluster.lng, count: cluster.members.length, value: cluster.value, meanScore: cluster.meanScore });
         polygon.addListener('click', () => setSelected({ kind: 'cluster', name: `Flood cluster · ${cluster.members.length} properties`, lat: cluster.lat, lng: cluster.lng, count: cluster.members.length, value: cluster.value, meanScore: cluster.meanScore, status: `Connected wet properties within ${LINK_KM} km in the ${currentTier.label.toLowerCase()} scenario` }));
       });
       const flow = { path: 'M 0,-1 0,1', strokeOpacity: .9, strokeColor: color, scale: 2 };
@@ -628,17 +804,24 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
     if (layers.assets) {
       allAssets.forEach((asset) => {
         const wet = asset.score > 0;
-        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: asset.lat, lng: asset.lng }, title: `${asset.name} · ${currentTier.label} score ${asset.score.toFixed(2)}`, zIndex: wet ? 10 + Math.round(asset.score * 100) : 3,
+        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: asset.lat, lng: asset.lng }, zIndex: wet ? 10 + Math.round(asset.score * 100) : 3,
           icon: { path: maps.SymbolPath.CIRCLE, scale: wet ? 4 + asset.score * 9 : 2.6, fillColor: wet ? color : '#8a96a2', fillOpacity: wet ? .6 + asset.score * .35 : .45, strokeColor: '#fff', strokeWeight: wet ? 1.5 : .8 } }));
+        hoverable(marker, 'asset', asset);
         marker.addListener('click', () => setSelected({ ...asset, kind: 'asset' }));
       });
     }
 
     if (layers.hotspots) {
       hotspots.forEach((spot) => {
-        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: spot.latitude, lng: spot.longitude }, title: spot.name, zIndex: 200, icon: { path: 'M 0,-9 L 8,6 L -8,6 Z', fillColor: '#041d3b', fillOpacity: .9, strokeColor: '#fff', strokeWeight: 1.5, scale: 1 } }));
+        const marker = add(new maps.Marker({ map: mapRef.current, position: { lat: spot.latitude, lng: spot.longitude }, zIndex: 200, icon: { path: 'M 0,-9 L 8,6 L -8,6 Z', fillColor: '#041d3b', fillOpacity: .9, strokeColor: '#fff', strokeWeight: 1.5, scale: 1 } }));
+        hoverable(marker, 'hotspot', spot);
         marker.addListener('click', () => setSelected({ ...spot, kind: 'hotspot', lat: spot.latitude, lng: spot.longitude, status: 'Reference hotspot' }));
       });
+    }
+
+    if (offer) {
+      hoverable(add(new maps.Marker({ map: mapRef.current, position: { lat: offer.lat, lng: offer.lng }, zIndex: 400,
+        icon: { path: 'M 0,-13 L 4,-4 L 13,-4 L 6,2 L 9,12 L 0,6 L -9,12 L -6,2 L -13,-4 L -4,-4 Z', fillColor: '#d11242', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 1.1 } })), 'offer', offer);
     }
 
     if (layers.pulse) {
@@ -658,14 +841,17 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
       const top = [...mesh.wet].sort((a, b) => b.score - a.score).slice(0, PULSE_COUNT);
       if (top.length) { const layer = new PulseLayer(top); layer.setMap(mapRef.current); add(layer); }
     }
-    return () => { overlaysRef.current.forEach((item) => item.setMap(null)); overlaysRef.current = []; };
-  }, [mapStatus, activeTier, layers, allAssets, mesh, hotspots, setSelected, currentTier]);
+    return () => { overlaysRef.current.forEach((item) => item.setMap(null)); overlaysRef.current = []; setHover(null); };
+  }, [mapStatus, activeTier, layers, allAssets, mesh, hotspots, offer, setSelected, currentTier]);
 
   const tierStats = { wet: mesh.wet.length, total: allAssets.length, wetValue: mesh.wet.reduce((sum, asset) => sum + (asset.value || 0), 0), clusters: mesh.clusters.length, links: mesh.edges.length };
   return <section className="map-workspace">
     <header className="map-toolbar"><div className="map-search"><Search size={15} /><input placeholder="Search Nairobi location or portfolio property" /><span>⌘ K</span></div><button className={layerMenu ? 'active' : ''} onClick={() => setLayerMenu(!layerMenu)}><Layers3 size={16} /> Layers <ChevronDown size={13} /></button></header>
-    <div className="map-canvas" style={{'--tier': currentTier.color}}>
+    <div className="map-canvas" style={{'--tier': currentTier.color, '--rain': layers.rain ? currentTier.rain : 0}}>
       <div ref={node} className="google-map" />
+      <div className="rain-sky" aria-hidden="true"/>
+      <canvas ref={rainRef} className="rain-canvas" aria-hidden="true"/>
+      <MapTooltip hover={hover} tier={currentTier} assets={allAssets}/>
       {mapStatus !== 'ready' && <div className="map-fallback"><div className="map-grid"/>{allAssets.filter((asset) => asset.score > 0).slice(0, 60).map((asset) => <button key={asset.id} className="fallback-dot" style={{left:`${Math.max(2,Math.min(98,(asset.lng-36.6)/.5*100))}%`,top:`${Math.max(4,Math.min(96,(-1.1-asset.lat)/.4*100))}%`,'--pin':currentTier.color,'--s':asset.score}} title={asset.name} onClick={() => setSelected({ ...asset, kind: 'asset' })}/>)}<div className="map-setup"><Map size={22}/><strong>{mapStatus === 'missing' ? 'Add your Google Maps key for the live basemap' : mapStatus === 'error' ? 'Google Maps could not load' : 'Loading Nairobi map…'}</strong>{mapStatus === 'missing' && <span>VITE_GOOGLE_MAPS_API_KEY</span>}</div></div>}
       <div className="model-run"><span><i/> {portfolioSummary?.status === 'approved' ? 'APPROVED' : 'DRAFT'}: {PORTFOLIO_ID}</span><small>{portfolioSummary ? `KES ${(portfolioSummary.totalInsuredValueKes / 1e9).toFixed(3)}B TIV · ${portfolioSummary.propertyCount} properties` : 'Loading portfolio…'}</small></div>
       <div className="tier-control"><div><span>HAZARD SUSCEPTIBILITY TIER</span><small>Proxy score · not flood depth</small></div><div className="tier-buttons">{TIERS.map((tier) => <button key={tier.id} className={activeTier === tier.id ? 'active' : ''} style={{'--tier':tier.color}} onClick={() => setActiveTier(tier.id)}><i />{tier.label}<span>{tier.range}</span></button>)}</div></div>
@@ -676,8 +862,9 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
         <div className="legend-row"><i className="ramp" style={{background:`linear-gradient(90deg, ${currentTier.color}55, ${currentTier.color})`}}/>Size and colour = proxy score 0 → 1</div>
         {layers.mesh && <><div className="legend-row"><i className="line" style={{borderColor: currentTier.color}}/>{tierStats.links} connectors: wet neighbours within {LINK_KM} km</div><div className="legend-row"><i className="hull" style={{borderColor: currentTier.color, background: `${currentTier.color}22`}}/>{tierStats.clusters} flood clusters (4+ connected)</div></>}
         {layers.pulse && <div className="legend-row"><i className="pulse-key" style={{'--pulse': currentTier.color}}/>Pulsing: {Math.min(PULSE_COUNT, tierStats.wet)} highest scores</div>}
+        {layers.rain && <div className="legend-row"><i className="rain-key"/>Rain over wet buildings · {Math.round(currentTier.rain * 100)}% intensity (rarer, larger floods rain harder)</div>}
       </div>
-      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['assets','Portfolio properties'],['mesh','Flood clusters & connectors'],['pulse','Pulse highest scores'],['hotspots','Documented hotspots']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Scenario: {currentTier.label} ({currentTier.range})</small></div>}
+      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['assets','Portfolio properties'],['rain','Rain over flooded areas'],['mesh','Flood clusters & connectors'],['pulse','Pulse highest scores'],['hotspots','Documented hotspots']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Scenario: {currentTier.label} ({currentTier.range})</small></div>}
       {selected && <div className="asset-inspector"><button className="close" onClick={() => setSelected(null)}><X size={15}/></button><span className="inspector-type">{selected.kind === 'hotspot' ? 'REFERENCE HOTSPOT' : selected.kind === 'cluster' ? 'FLOOD CLUSTER' : 'PORTFOLIO PROPERTY'}</span><h3>{selected.name}</h3><p><MapPin size={12}/> {selected.lat.toFixed(4)}, {selected.lng.toFixed(4)}</p><div className="inspector-grid">{selected.kind === 'cluster' ? <><div><span>PROPERTIES</span><strong>{selected.count}</strong></div><div><span>MEAN {currentTier.label.toUpperCase()} SCORE</span><strong style={{color:currentTier.color}}>{selected.meanScore.toFixed(2)}</strong></div><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>SCENARIO</span><strong>{currentTier.range}</strong></div></> : <><div><span>{currentTier.label.toUpperCase()} SCORE</span><strong style={{color: (selected.hazardScores?.[activeTier] ?? 0) > 0 ? currentTier.color : undefined}}>{selected.hazardScores?.[activeTier] == null ? 'n/a' : Number(selected.hazardScores[activeTier]).toFixed(2)}</strong></div><div><span>SCENARIO</span><strong style={{color:currentTier.color}}>{currentTier.label} · {currentTier.range}</strong></div>{selected.value != null && <><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>APPROVED 1-IN-100 LOSS</span><strong className="danger">{selected.loss == null ? 'Pending run' : `KES ${selected.loss.toFixed(2)}M`}</strong></div></>}</>}</div><div className="inspector-caveat"><AlertTriangle size={13}/>{selected.status || 'Portfolio source'}</div>{selected.kind !== 'cluster' && <button className="ask-location" onClick={() => setSelected({...selected, ask:true})}><Bot size={15}/> Ask Furika Bot about this location <MessageSquareText size={13}/></button>}</div>}
     </div>
     <footer className="coordinates">{currentTier.label} scenario <i/> {tierStats.wet} wet properties <i/> {tierStats.clusters} clusters <i/> {tierStats.links} connectors <span>GOOGLE MAPS · PROXY OVERLAY</span></footer>
@@ -762,6 +949,8 @@ function Workspace({ onLogout }) {
   const [rightOpen, setRightOpen] = useState(false);
   const [workflowRunSignal, setWorkflowRunSignal] = useState(0);
   const [workflowReloadSignal, setWorkflowReloadSignal] = useState(0);
+  const [offerSite, setOfferSite] = useState(null);
+  const showOffer = (site) => { setOfferSite(site); setRightView('map'); setRightOpen(true); };
   const showPendingRun = () => { setRightView('workflow'); setRightOpen(true); setWorkflowReloadSignal((signal) => signal + 1); };
   const [uploads, setUploads] = useState([]);
   const [sourcesLoad, setSourcesLoad] = useState({ status: 'loading', message: '' });
@@ -852,8 +1041,8 @@ function Workspace({ onLogout }) {
   };
   return <main className={`workspace ${chatOpen ? '' : 'chat-collapsed'} ${navExpanded ? 'nav-expanded' : ''}`}>
     <header className="app-header minimal"><Brand /><div className="header-actions"><button className="profile-button"><span className="header-avatar">AO</span><span>Dr. A. Omondi</span></button><button onClick={onLogout} title="Sign out"><LogOut size={16}/></button></div></header>
-    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data store</strong></button><button className={`rail-bot ${activeScreen==='workspace'?'active':''}`} onClick={()=>setActiveScreen('workspace')}><FurikaMascot size={26}/><strong>Furika Bot</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button></div></nav>
-      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource} onReprocessSource={reprocessDataSource} attested={attested} setAttested={setAttested} loadState={sourcesLoad} uploadErrors={uploadErrors} onDismissErrors={() => setUploadErrors([])}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} onWorkflowPending={showPendingRun} reportReady={reportReady} portfolioSummary={portfolioSummary} dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} properties={mapProperties} hotspots={mapHotspots} portfolioSummary={portfolioSummary}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} reloadSignal={workflowReloadSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>{setReportReady(true);refreshMap()}}/></div></div></div>}</div>}
+    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data store</strong></button><button className={`rail-bot ${activeScreen==='workspace'?'active':''}`} onClick={()=>setActiveScreen('workspace')}><FurikaMascot size={26}/><strong>Furika Bot</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button><button className={activeScreen==='accumulation'?'active':''} onClick={()=>setActiveScreen('accumulation')}><Layers3 size={19}/><strong>Accumulation</strong></button></div></nav>
+      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : activeScreen==='accumulation' ? <AccumulationScreen dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource} onReprocessSource={reprocessDataSource} attested={attested} setAttested={setAttested} loadState={sourcesLoad} uploadErrors={uploadErrors} onDismissErrors={() => setUploadErrors([])}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} onWorkflowPending={showPendingRun} onOfferLocation={showOffer} reportReady={reportReady} portfolioSummary={portfolioSummary} dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} properties={mapProperties} hotspots={mapHotspots} offer={offerSite} portfolioSummary={portfolioSummary}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} reloadSignal={workflowReloadSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>{setReportReady(true);refreshMap()}}/></div></div></div>}</div>}
     </div>
   </main>;
 }

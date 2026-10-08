@@ -193,7 +193,7 @@ def test_reject_restores_previous_version_or_removes(seeded):
 
 
 def test_unsupported_construction_requires_edit(seeded):
-    content = "loc_id,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes\nRCC-1,-1.2585,36.8556,RCC high-rise,2400,90000\n"
+    content = "loc_id,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes\nRCC-1,-1.2585,36.8556,Steel frame,2400,90000\n"
     item = rows(seeded, upload(seeded, content)["id"])[0]
     response = decide(seeded, item["id"], "confirm")
     assert response.status_code == 409

@@ -94,7 +94,7 @@ buildings: one entry per insured building or site. For each field the document s
 - page and confidence (0-1).
 Omit fields the document does not state. Field meanings:
 {fields}
-For housing_class, use the document's own construction description (for example "RCC frame high-rise") unless it clearly is one of: informal_iron_sheet, semi_permanent, permanent_masonry.
+For housing_class, use the document's own construction description (for example "RCC frame high-rise") unless it clearly is one of: informal_iron_sheet, semi_permanent, permanent_masonry, concrete_rcc.
 
 facts: document-level statements that are not per-building fields. kind is one of:
 - fact: a descriptive or physical statement;

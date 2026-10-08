@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from sqlalchemy import event
 
 from app import create_app
 from app.config import TestingConfig
@@ -18,6 +19,9 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "get_llm", lambda: None)
     application = create_app(Config)
     with application.app_context():
+        # enforce foreign keys like Postgres does, so insert-order bugs fail here too
+        event.listen(db.engine, "connect", lambda conn, _: conn.execute("PRAGMA foreign_keys=ON"))
+        db.engine.dispose()
         db.create_all()
         yield application
         db.session.remove()
