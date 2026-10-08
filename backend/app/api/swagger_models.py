@@ -34,6 +34,9 @@ portfolio_summary_model = api.model("PortfolioSummary", {
     "status": fields.String(enum=["draft", "running", "review", "approved"]),
     "totalInsuredValueKes": fields.Float,
     "propertyCount": fields.Integer,
+    "confirmedCount": fields.Integer,
+    "unconfirmedCount": fields.Integer,
+    "hazardMissingCount": fields.Integer,
     "portfolioAalKes": fields.Float,
     "aalPercentTiv": fields.Float,
     "loss100Kes": fields.Float,
@@ -64,6 +67,16 @@ property_list_item_model = api.model("PropertyListItem", {
     "cluster": fields.String,
     "aiFlagged": fields.Boolean,
     "sourceTag": fields.String,
+    "reviewStatus": fields.String(enum=["confirmed", "unconfirmed"]),
+    "hazardSource": fields.String(enum=["supplied", "interpolated", "missing"]),
+    "geocodePrecision": fields.String,
+    "hazardScores": fields.Raw(description="Five proxy hazard scores keyed by tier, or null."),
+    "issueCount": fields.Integer(description="Warnings and review items from the upload that last wrote this property."),
+    "nearestHotspotKm": fields.Float(description="Distance to the nearest named flood hotspot, or null when none are loaded."),
+})
+
+property_created_model = api.clone("PropertyCreated", property_list_item_model, {
+    "issues": fields.Raw(description="Warnings and review items raised while evaluating the new property."),
 })
 
 property_list_response = api.model("PropertyListResponse", {
@@ -77,9 +90,10 @@ property_create_request = api.model("PropertyCreateRequest", {
     "id": fields.String(required=False, example="NBO-0601"),
     "name": fields.String(required=True, example="New synthetic warehouse"),
     "region": fields.String(example="Embakasi"),
-    "latitude": fields.Float(required=True, example=-1.3071),
-    "longitude": fields.Float(required=True, example=36.8912),
-    "housingClass": fields.String(example="engineered_concrete"),
+    "latitude": fields.Float(example=-1.3071),
+    "longitude": fields.Float(example=36.8912),
+    "housingClass": fields.String(example="permanent_masonry"),
+    "address": fields.String(example="Mombasa Road, Embakasi", description="Geocoded when latitude/longitude are omitted."),
     "floorAreaM2": fields.Float(example=750),
     "costPerM2Kes": fields.Float(example=140000),
     "insuredValueKes": fields.Float(example=105000000),
@@ -107,6 +121,7 @@ cluster_model = api.model("Cluster", {
     "annualFloodProbability": fields.Float,
     "portfolioLossShare": fields.Float,
     "riskBand": fields.String,
+    "tivShare": fields.Float,
     "classMix": fields.Raw,
     "hotspotFlag": fields.Boolean,
     "accumulationFlag": fields.String,

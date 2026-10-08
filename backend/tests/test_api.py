@@ -1,7 +1,3 @@
-from app import create_app
-from app.config import TestingConfig
-
-
 SAMPLE_EXPOSURE = [
     {
         "loc_id": "NBO-TEST-001",
@@ -21,43 +17,40 @@ SAMPLE_EXPOSURE = [
 ]
 
 
-def client():
-    app = create_app(TestingConfig)
-    return app.test_client()
 
-
-def test_health():
-    response = client().get("/api/v1/health")
+def test_health(client):
+    response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json["status"] == "ok"
 
 
-def test_swagger_json():
-    response = client().get("/api/v1/swagger.json")
+def test_swagger_json(client):
+    response = client.get("/api/v1/swagger.json")
     assert response.status_code == 200
     assert response.json["info"]["title"] == "Furika AI Catastrophe Modelling API"
 
 
-def test_swagger_ui():
-    response = client().get("/api/v1/docs")
+def test_swagger_ui(client):
+    response = client.get("/api/v1/docs")
     assert response.status_code == 200
     assert "Furika AI Catastrophe Modelling API" in response.get_data(as_text=True)
 
 
-def test_property_search():
-    response = client().get("/api/v1/portfolios/SYN-PORT-142/properties?q=Mathare")
+def test_property_search(seeded):
+    response = seeded.get("/api/v1/portfolios/SYN-PORT-142/properties?q=Mathare")
     assert response.status_code == 200
     assert response.json["total"] == 2
 
 
-def test_property_detail():
-    response = client().get("/api/v1/properties/NBO-0002")
+def test_property_detail(seeded):
+    response = seeded.get("/api/v1/properties/NBO-0002")
     assert response.status_code == 200
     assert response.json["identity"]["id"] == "NBO-0002"
+    assert response.json["dummy"] is False
 
 
-def test_model_run_and_decision():
-    api_client = client()
+def test_model_run_and_decision(client):
+    api_client = client
     run_response = api_client.post("/api/v1/model-runs", json={"portfolioId": "SYN-PORT-142"})
     assert run_response.status_code == 202
     run_id = run_response.json["id"]
@@ -69,15 +62,15 @@ def test_model_run_and_decision():
     assert decision.json["status"] == "approved"
 
 
-def test_chat_contract():
-    response = client().post("/api/v1/chat", json={"message": "Explain NBO-0002", "mode": "analysis"})
+def test_chat_contract(client):
+    response = client.post("/api/v1/chat", json={"message": "Explain NBO-0002", "mode": "analysis"})
     assert response.status_code == 200
     assert response.json["dummy"] is True
     assert response.json["provider"] == "gemini"
 
 
-def test_exposure_validation_and_calculation_contract():
-    api_client = client()
+def test_exposure_validation_and_calculation_contract(client):
+    api_client = client
     validation = api_client.post("/api/v1/modelling/validate-exposure", json={"exposure": SAMPLE_EXPOSURE})
     assert validation.status_code == 200
     assert validation.json["valid"] is True
@@ -90,15 +83,15 @@ def test_exposure_validation_and_calculation_contract():
     assert calculation.json["aal"]["aal_central"] <= calculation.json["aal"]["aal_high"]
 
 
-def test_calculation_rejects_invalid_coordinates():
+def test_calculation_rejects_invalid_coordinates(client):
     bad_exposure = [{**SAMPLE_EXPOSURE[0], "lat": 8.0}]
-    response = client().post("/api/v1/modelling/calculate", json={"exposure": bad_exposure})
+    response = client.post("/api/v1/modelling/calculate", json={"exposure": bad_exposure})
     assert response.status_code == 400
     assert "outside the configured Nairobi bounds" in response.json["message"]
 
 
-def test_ep_curve_and_vulnerability_contracts():
-    api_client = client()
+def test_ep_curve_and_vulnerability_contracts(client):
+    api_client = client
     ratio = api_client.post(
         "/api/v1/modelling/damage-ratio",
         json={"depthM": [0, 1], "housingClass": ["semi_permanent", "semi_permanent"]},

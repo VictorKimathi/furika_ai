@@ -58,6 +58,11 @@ class Property(TimestampMixin, db.Model):
     insured_value_kes = db.Column(db.Numeric(18, 2))
     source_tag = db.Column(db.String(30), nullable=False, default="synthetic")
     attributes = db.Column(JSONType, nullable=False, default=dict)
+    upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True, index=True)
+    review_status = db.Column(db.String(20), nullable=False, default="confirmed")
+    geocode_precision = db.Column(db.String(20), nullable=False, default="supplied")
+    hazard_source = db.Column(db.String(20), nullable=False, default="supplied")
+    nearest_hotspot_km = db.Column(db.Float, index=True)
 
     portfolio = db.relationship("Portfolio", backref=db.backref("properties", lazy="dynamic"))
 
@@ -155,3 +160,101 @@ class Message(TimestampMixin, db.Model):
     content = db.Column(db.Text, nullable=False)
     citations = db.Column(JSONType, nullable=False, default=list)
     metadata_json = db.Column(JSONType, nullable=False, default=dict)
+
+
+class Upload(TimestampMixin, db.Model):
+    __tablename__ = "uploads"
+    __table_args__ = (db.UniqueConstraint("portfolio_id", "sha256", name="uq_uploads_portfolio_sha256"),)
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    portfolio_id = db.Column(db.String(64), db.ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    filename = db.Column(db.String(255), nullable=False)
+    media_type = db.Column(db.String(120))
+    size_bytes = db.Column(db.Integer, nullable=False)
+    sha256 = db.Column(db.String(64), nullable=False)
+    storage_path = db.Column(db.String(512), nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="received")
+    attestation = db.Column(db.String(30), nullable=False)
+    extractor = db.Column(db.String(30), nullable=False)
+    summary = db.Column(JSONType, nullable=False, default=dict)
+    error = db.Column(db.Text)
+
+
+class UploadRow(TimestampMixin, db.Model):
+    __tablename__ = "upload_rows"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
+    row_ref = db.Column(db.String(160), nullable=False)
+    position = db.Column(db.Integer, nullable=False)
+    data = db.Column(JSONType, nullable=False, default=dict)
+    status = db.Column(db.String(30), nullable=False)
+    property_id = db.Column(db.String(64), db.ForeignKey("properties.id", ondelete="SET NULL"), nullable=True, index=True)
+    reviewed_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime(timezone=True))
+    review_comment = db.Column(db.Text)
+
+
+class FieldProvenance(TimestampMixin, db.Model):
+    __tablename__ = "field_provenance"
+    __table_args__ = (db.Index("ix_field_provenance_subject", "subject_type", "subject_id"),)
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    subject_type = db.Column(db.String(30), nullable=False)
+    subject_id = db.Column(db.String(64), nullable=False)
+    field = db.Column(db.String(80), nullable=False)
+    value = db.Column(JSONType)
+    raw_value = db.Column(db.Text)
+    method = db.Column(db.String(30), nullable=False)
+    source_upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="CASCADE"), nullable=True, index=True)
+    source_column = db.Column(db.String(255))
+    page = db.Column(db.Integer)
+    quote = db.Column(db.Text)
+    confidence = db.Column(db.Float)
+    kind = db.Column(db.String(20), nullable=False, default="fact")
+    confirmed_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    confirmed_at = db.Column(db.DateTime(timezone=True))
+    superseded_by = db.Column(db.String(36))
+
+
+class ValidationIssue(TimestampMixin, db.Model):
+    __tablename__ = "validation_issues"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
+    upload_row_id = db.Column(db.String(36), db.ForeignKey("upload_rows.id", ondelete="CASCADE"), nullable=True, index=True)
+    code = db.Column(db.String(60), nullable=False)
+    severity = db.Column(db.String(20), nullable=False)
+    field = db.Column(db.String(80))
+    message = db.Column(db.Text, nullable=False)
+    evidence = db.Column(JSONType, nullable=False, default=dict)
+    resolved_by = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    resolution = db.Column(db.String(30))
+    resolved_at = db.Column(db.DateTime(timezone=True))
+
+
+class HazardReferencePoint(TimestampMixin, db.Model):
+    """Scored locations used to interpolate hazard for buildings without supplied scores."""
+
+    __tablename__ = "hazard_reference_points"
+
+    id = db.Column(db.String(64), primary_key=True)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    scores = db.Column(JSONType, nullable=False)
+    housing_class = db.Column(db.String(80))
+    cost_per_m2_kes = db.Column(db.Float)
+    source_upload_id = db.Column(db.String(36), db.ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True)
+
+
+class Hotspot(TimestampMixin, db.Model):
+    __tablename__ = "hotspots"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    name = db.Column(db.String(160), nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    severity = db.Column(db.String(20))
+    weight = db.Column(db.Float)
+    source_sha256 = db.Column(db.String(64))

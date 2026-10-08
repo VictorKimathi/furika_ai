@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 
 def _database_url() -> str:
@@ -34,6 +35,10 @@ class Config:
     AI_PROVIDER = "gemini"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = _gemini_model()
+    STORAGE_ROOT = os.getenv("STORAGE_ROOT", str(Path(__file__).resolve().parent.parent / "storage"))
+    UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+    MAX_CONTENT_LENGTH = UPLOAD_MAX_BYTES + 1024 * 1024
+    AI_MAPPING_AUTO_CONFIRM = 0.9
 
 
 class TestingConfig(Config):

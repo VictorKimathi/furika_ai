@@ -18,7 +18,11 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileArchive,
+  FileSpreadsheet,
   FileText,
+  FileUp,
+  FolderOpen,
   History,
   Layers3,
   LockKeyhole,
@@ -45,6 +49,7 @@ import {
   TableProperties,
   TrendingUp,
   Trash2,
+  Upload,
   UserRound,
   Waves,
   Workflow,
@@ -60,6 +65,7 @@ import './chat-first.css';
 import './workflow-canvas.css';
 import './stage-inspector.css';
 import './recent-chats.css';
+import './data-sources.css';
 import PortfolioScreen from './PortfolioScreen.jsx';
 
 const TIERS = [
@@ -93,6 +99,34 @@ const MODEL_FACTS = {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+
+const DATA_SOURCES_STORAGE_KEY = 'furika-data-sources';
+const DEFAULT_DATA_SOURCES = [
+  { id: 'source-exposure', name: 'exposure_nairobi_with_hazard.csv', extension: 'CSV', size: 4860000, uploadedAt: '2026-09-30T08:24:00.000Z', records: '600 assets', status: 'Ready', content: '' },
+  { id: 'source-hotspots', name: 'nairobi_flood_hotspots.geojson', extension: 'GEOJSON', size: 84200, uploadedAt: '2026-09-30T08:31:00.000Z', records: '24 locations', status: 'Ready', content: '' },
+  { id: 'source-vulnerability', name: 'vulnerability_reference_curves.xlsx', extension: 'XLSX', size: 126400, uploadedAt: '2026-10-01T06:12:00.000Z', records: '3 classes', status: 'Ready', content: '' },
+];
+
+function loadDataSources() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DATA_SOURCES_STORAGE_KEY) || 'null');
+    return Array.isArray(stored) ? stored : DEFAULT_DATA_SOURCES;
+  } catch {
+    return DEFAULT_DATA_SOURCES;
+  }
+}
+
+function formatFileSize(bytes = 0) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function sourceIcon(extension, size = 18) {
+  if (['CSV', 'XLS', 'XLSX'].includes(extension)) return <FileSpreadsheet size={size}/>;
+  if (['ZIP', 'TIF', 'TIFF'].includes(extension)) return <FileArchive size={size}/>;
+  return <FileText size={size}/>;
+}
 
 let mapsPromise;
 function loadGoogleMaps(apiKey) {
@@ -211,7 +245,7 @@ function ResponseActions({ reportReady, onOpenView }) {
   return <div className="response-actions">{reportReady && <span><CheckCircle2 size={13}/> Report ready</span>}<button onClick={()=>onOpenView('workflow', !reportReady)}><Workflow size={13}/> View workflow</button><button onClick={()=>onOpenView('map')}><Map size={13}/> Open map</button></div>;
 }
 
-function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, reportReady }) {
+function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, reportReady, dataSources, onUploadFiles }) {
   const [messages, setMessages] = useState([INITIAL_CHAT_MESSAGE]);
   const [activeChatId, setActiveChatId] = useState(() => `chat-${Date.now()}`);
   const [recentChats, setRecentChats] = useState(() => {
@@ -222,7 +256,10 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
   const [busy, setBusy] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(-1);
   const [preview, setPreview] = useState(null);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [attachedSourceIds, setAttachedSourceIds] = useState([]);
   const thread = useRef(null);
+  const contextFileInput = useRef(null);
   const reportDelivered = useRef(false);
   const thinkingTimer = useRef(null);
 
@@ -267,8 +304,15 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
   const submit = async (value = input) => {
     const text = value.trim();
     if (!text || busy) return;
+    const selectedSources = dataSources.filter((source) => attachedSourceIds.includes(source.id));
+    const sourceContext = selectedSources.map((source) => source.content
+      ? `Source: ${source.name}\n${source.content}`
+      : `Source attached by name: ${source.name} (${source.extension}, ${formatFileSize(source.size)}). File contents are not available as text.`).join('\n\n').slice(0, 120000);
+    const requestText = sourceContext ? `${text}\n\nUser-selected data source context:\n${sourceContext}` : text;
     setInput('');
-    setMessages((current) => [...current, { role: 'user', content: text }]);
+    setAttachedSourceIds([]);
+    setContextOpen(false);
+    setMessages((current) => [...current, { role: 'user', content: text, attachments: selectedSources.map((source) => source.name) }]);
     setBusy(true);
     setThinkingStep(0);
     const startedAt = Date.now();
@@ -289,17 +333,17 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
     if (/\b(add|create|include|model)\b/i.test(text) && /\b(property|warehouse|building|apartment|asset|portfolio)\b/i.test(text)) {
       let parsed = parseProperty(text);
       try {
-        const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'exposure' }) });
+        const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: requestText, mode: 'exposure' }) });
         if (response.ok) { const data = await response.json(); if (data.asset) parsed = { ...parsed, ...data.asset, id: parsed.id }; }
       } catch { /* deterministic preview remains available */ }
       await completeThinking(); setPreview(parsed); return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis' }) });
+      const response = await fetch(`${API_BASE_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: requestText, mode: 'analysis' }) });
       if (!response.ok) throw new Error('AI unavailable');
       const data = await response.json();
       await completeThinking();
-      setMessages((current) => [...current, { role: 'assistant', content: data.answer, source: data.source || 'Furika model context', actions: true }]);
+      setMessages((current) => [...current, { role: 'assistant', content: data.answer, source: selectedSources.length ? `${data.source || 'Furika model context'} · ${selectedSources.length} attached source${selectedSources.length === 1 ? '' : 's'}` : data.source || 'Furika model context', actions: true }]);
     } catch {
       await completeThinking();
       setMessages((current) => [...current, { role: 'assistant', content: fallbackAnswer(text), source: 'Team A brief · local verified model context', actions: true }]);
@@ -334,6 +378,16 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
     if (id === activeChatId) startNewChat();
   };
 
+  const uploadChatFiles = async (event) => {
+    const added = await onUploadFiles(event.target.files);
+    setAttachedSourceIds((current) => [...new Set([...current, ...added.map((source) => source.id)])]);
+    event.target.value = '';
+  };
+
+  const toggleAttachedSource = (sourceId) => {
+    setAttachedSourceIds((current) => current.includes(sourceId) ? current.filter((id) => id !== sourceId) : [...current, sourceId]);
+  };
+
   return <section className="chat-panel">
     <header className="panel-header"><div className="panel-title"><div><Bot size={19} /></div><span><strong>Furika AI Cat Analyst <i /></strong><small>Hazard → Vulnerability → Exposure → Loss</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Recent chats" onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/><span>Recent</span></button><button title="New conversation" onClick={startNewChat}><Plus size={16}/></button></div></header>
     {historyOpen && <aside className="recent-chats"><div className="recent-chats-head"><div><History size={15}/><strong>Recent chats</strong></div><button onClick={()=>setHistoryOpen(false)}><X size={15}/></button></div><button className="new-chat-button" onClick={startNewChat}><Plus size={14}/> New analysis</button><div className="recent-chat-list">{recentChats.length?recentChats.map((chat)=><button key={chat.id} className={chat.id===activeChatId?'active':''} onClick={()=>openRecentChat(chat)}><MessageSquareText size={14}/><span><strong>{chat.title}</strong><small>{new Date(chat.updatedAt).toLocaleDateString('en-KE',{month:'short',day:'numeric'})} · {new Date(chat.updatedAt).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</small></span><i onClick={(event)=>removeRecentChat(event,chat.id)} title="Delete chat"><Trash2 size={13}/></i></button>):<div className="no-recent-chats"><MessageSquareText size={20}/><strong>No recent chats</strong><span>Your completed conversations will appear here.</span></div>}</div></aside>}
@@ -341,14 +395,20 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, repo
       <div className="analyst-banner"><Sparkles size={15} /><div><strong>Model run SYN-PORT-142 is active</strong><span>Ask a question or describe a synthetic property to add.</span></div></div>
       {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
         <div className="message-meta">{message.role === 'assistant' ? 'FURIKA CAT MODELLING ENGINE' : 'DR. A. OMONDI'} <span>· just now</span></div>
-        <div className="message-bubble"><p>{message.content}</p>{message.summary && <ModelSummary />}{message.source && <small className="message-source"><FileText size={11} /> {message.source}</small>}{message.actions && <ResponseActions reportReady={reportReady} onOpenView={onOpenView}/>}</div>
+        <div className="message-bubble"><p>{message.content}</p>{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.summary && <ModelSummary />}{message.source && <small className="message-source"><FileText size={11} /> {message.source}</small>}{message.actions && <ResponseActions reportReady={reportReady} onOpenView={onOpenView}/>}</div>
       </div>)}
       {preview && <ExposurePreview asset={preview} onConfirm={confirmAsset} onCancel={() => setPreview(null)} />}
       {busy && <ThinkingTrace activeStep={thinkingStep} onOpenWorkflow={onOpenView}/>} 
       {!!addedAssets.length && <div className="portfolio-update"><Database size={14} /> {addedAssets.length} AI-derived synthetic {addedAssets.length === 1 ? 'asset' : 'assets'} added this session</div>}
     </div>
     <div className="quick-prompts"><span>QUICK QUERIES</span>{['Explain the EP curve','Compare Kibera and Mathare','Show model limitations'].map((q) => <button key={q} onClick={() => submit(q)}>{q}</button>)}</div>
-    <div className="chat-composer"><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="Ask Furika AI or describe a synthetic property, e.g. ‘Add a KES 35M warehouse in Mathare’…" /><div><span><Plus size={14} /> Add context</span><small>Shift+Enter for new line</small><button onClick={() => submit()} disabled={!input.trim() || busy}>Analyse <Send size={14} /></button></div></div>
+    <div className="chat-composer">
+      {attachedSourceIds.length > 0 && <div className="attached-sources">{dataSources.filter((source) => attachedSourceIds.includes(source.id)).map((source) => <span key={source.id}>{sourceIcon(source.extension, 12)}<strong>{source.name}</strong><button title={`Remove ${source.name}`} onClick={() => toggleAttachedSource(source.id)}><X size={11}/></button></span>)}</div>}
+      <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="Ask Furika AI or describe a synthetic property, e.g. ‘Add a KES 35M warehouse in Mathare’…" />
+      <div className="composer-actions"><button className={contextOpen ? 'context-trigger active' : 'context-trigger'} onClick={() => setContextOpen(!contextOpen)}><Plus size={14}/> Add context</button><small>Shift+Enter for new line</small><button className="analyse-button" onClick={() => submit()} disabled={!input.trim() || busy}>Analyse <Send size={14}/></button></div>
+      <input ref={contextFileInput} className="hidden-file-input" type="file" multiple accept=".csv,.json,.geojson,.txt,.xlsx,.xls,.tif,.tiff,.zip" onChange={uploadChatFiles}/>
+      {contextOpen && <div className="context-picker"><header><div><Database size={15}/><span><strong>Add data source</strong><small>Use a new or previously uploaded file</small></span></div><button onClick={() => setContextOpen(false)}><X size={14}/></button></header><button className="upload-context" onClick={() => contextFileInput.current?.click()}><FileUp size={17}/><span><strong>Upload from this device</strong><small>CSV, Excel, GeoJSON, text, raster, or ZIP</small></span><ChevronRight size={14}/></button><div className="context-library-title"><span>UPLOADED SOURCES</span><em>{dataSources.length}</em></div><div className="context-library">{dataSources.length ? dataSources.map((source) => <button key={source.id} className={attachedSourceIds.includes(source.id) ? 'selected' : ''} onClick={() => toggleAttachedSource(source.id)}><i>{sourceIcon(source.extension, 15)}</i><span><strong>{source.name}</strong><small>{source.extension} · {formatFileSize(source.size)}</small></span><em>{attachedSourceIds.includes(source.id) ? <Check size={12}/> : <Plus size={12}/>}</em></button>) : <p>No uploaded sources yet.</p>}</div></div>}
+    </div>
   </section>;
 }
 
@@ -512,6 +572,41 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, addedA
   </section>;
 }
 
+function DataSourcesScreen({ dataSources, onUploadFiles, onDeleteSource }) {
+  const [search, setSearch] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef(null);
+  const filteredSources = useMemo(() => dataSources.filter((source) => source.name.toLowerCase().includes(search.toLowerCase()) || source.extension.toLowerCase().includes(search.toLowerCase())), [dataSources, search]);
+  const totalSize = dataSources.reduce((sum, source) => sum + (source.size || 0), 0);
+
+  const upload = async (files) => {
+    if (!files?.length) return;
+    setUploading(true);
+    await onUploadFiles(files);
+    setUploading(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setDragging(false);
+    upload(event.dataTransfer.files);
+  };
+
+  return <section className="data-sources-screen">
+    <header className="data-sources-header"><div><span className="section-kicker">MODEL INPUTS</span><h1>Data sources</h1><p>Upload and manage the files available to your catastrophe modelling workspace.</p></div><button onClick={() => fileInput.current?.click()}><Upload size={16}/>{uploading ? 'Uploading…' : 'Upload data source'}</button></header>
+    <input ref={fileInput} className="hidden-file-input" type="file" multiple accept=".csv,.json,.geojson,.txt,.xlsx,.xls,.tif,.tiff,.zip" onChange={(event) => { upload(event.target.files); event.target.value = ''; }}/>
+    <div className="source-summary"><div><span className="summary-icon teal"><Database size={19}/></span><p><strong>{dataSources.length}</strong><small>Total sources</small></p></div><div><span className="summary-icon purple"><FileSpreadsheet size={19}/></span><p><strong>{dataSources.filter((source) => ['CSV','XLS','XLSX'].includes(source.extension)).length}</strong><small>Tabular datasets</small></p></div><div><span className="summary-icon green"><CheckCircle2 size={19}/></span><p><strong>{dataSources.filter((source) => source.status === 'Ready').length}</strong><small>Ready to use</small></p></div><div><span className="summary-icon amber"><FileArchive size={19}/></span><p><strong>{formatFileSize(totalSize)}</strong><small>Total storage</small></p></div></div>
+    <div className={dragging ? 'source-dropzone dragging' : 'source-dropzone'} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragging(false); }} onDrop={handleDrop}>
+      <span><FileUp size={22}/></span><div><strong>Drop data files here</strong><p>or <button onClick={() => fileInput.current?.click()}>browse your device</button></p></div><small>CSV, XLSX, GeoJSON, TXT, TIF, or ZIP · up to 25 MB each</small>
+    </div>
+    <div className="source-library">
+      <div className="source-library-toolbar"><div><h2>Your sources</h2><span>{filteredSources.length} {filteredSources.length === 1 ? 'file' : 'files'}</span></div><label><Search size={15}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search data sources"/></label></div>
+      <div className="source-table"><div className="source-table-head"><span>NAME</span><span>TYPE</span><span>SIZE</span><span>UPLOADED</span><span>STATUS</span><span/></div>{filteredSources.length ? filteredSources.map((source) => <div className="source-row" key={source.id}><div className="source-name"><i>{sourceIcon(source.extension)}</i><span><strong>{source.name}</strong><small>{source.records || 'User upload'}</small></span></div><span><em className="file-type">{source.extension}</em></span><span>{formatFileSize(source.size)}</span><span>{new Date(source.uploadedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</span><span><em className="source-status"><i/> {source.status}</em></span><button className="delete-source" title={`Delete ${source.name}`} onClick={() => onDeleteSource(source.id)}><Trash2 size={15}/></button></div>) : <div className="empty-sources"><FolderOpen size={27}/><strong>No matching data sources</strong><span>Try a different search or upload a new file.</span></div>}</div>
+    </div>
+  </section>;
+}
+
 function Workspace({ onLogout }) {
   const [activeScreen, setActiveScreen] = useState('workspace');
   const [tier, setTier] = useState('severe');
@@ -524,7 +619,26 @@ function Workspace({ onLogout }) {
   const [navExpanded, setNavExpanded] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [workflowRunSignal, setWorkflowRunSignal] = useState(0);
+  const [dataSources, setDataSources] = useState(loadDataSources);
+  useEffect(() => {
+    try { localStorage.setItem(DATA_SOURCES_STORAGE_KEY, JSON.stringify(dataSources)); } catch { /* keep the in-memory library available if browser storage is full */ }
+  }, [dataSources]);
   useEffect(() => { if (selected?.ask) { setChatContext({...selected}); setSelected({...selected, ask:false}); } }, [selected]);
+  const uploadDataSources = async (files) => {
+    const acceptedFiles = Array.from(files || []).filter((file) => file.size <= 25 * 1024 * 1024);
+    const added = await Promise.all(acceptedFiles.map(async (file) => {
+      const extension = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'FILE';
+      const canReadAsText = ['CSV', 'JSON', 'GEOJSON', 'TXT'].includes(extension);
+      let content = '';
+      if (canReadAsText) {
+        try { content = (await file.text()).slice(0, 40000); } catch { content = ''; }
+      }
+      return { id: globalThis.crypto?.randomUUID?.() || `source-${Date.now()}-${Math.random().toString(16).slice(2)}`, name: file.name, extension, size: file.size, uploadedAt: new Date().toISOString(), records: 'User upload', status: 'Ready', content };
+    }));
+    setDataSources((current) => [...added, ...current.filter((source) => !added.some((item) => item.name === source.name))]);
+    return added;
+  };
+  const deleteDataSource = (sourceId) => setDataSources((current) => current.filter((source) => source.id !== sourceId));
   const askAboutProperty = (property) => {
     setChatContext({ ...property, score: property.hazard, status: property.ai ? 'Drainage-linked evidence requires review' : 'Synthetic exposure · assumed vulnerability' });
     setActiveScreen('workspace');
@@ -533,8 +647,8 @@ function Workspace({ onLogout }) {
   };
   return <main className={`workspace ${chatOpen ? '' : 'chat-collapsed'}`}>
     <header className="app-header minimal"><Brand /><div className="header-actions"><button className="profile-button"><span className="header-avatar">AO</span><span>Dr. A. Omondi</span></button><button onClick={onLogout} title="Sign out"><LogOut size={16}/></button></div></header>
-    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><button className={activeScreen==='workspace'?'active':''} onClick={()=>setActiveScreen('workspace')}><Map size={19}/><strong>Workspace</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button><button><Layers3 size={19}/><strong>Data layers</strong></button><button><BarChart3 size={19}/><strong>Model results</strong></button><button><Database size={19}/><strong>Data sources</strong></button><span/><button><SlidersHorizontal size={19}/><strong>Assumptions</strong></button><button><Settings2 size={19}/><strong>Settings</strong></button></nav>
-      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} reportReady={reportReady}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} addedAssets={assets}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>setReportReady(true)}/></div></div></div>}</div>}
+    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><button className={activeScreen==='workspace'?'active':''} onClick={()=>setActiveScreen('workspace')}><Map size={19}/><strong>Workspace</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data sources</strong></button><span/><button><SlidersHorizontal size={19}/><strong>Assumptions</strong></button><button><Settings2 size={19}/><strong>Settings</strong></button></nav>
+      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} reportReady={reportReady} dataSources={dataSources} onUploadFiles={uploadDataSources}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} addedAssets={assets}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>setReportReady(true)}/></div></div></div>}</div>}
     </div>
   </main>;
 }

@@ -1,0 +1,7 @@
+loc_id,name,region,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes,tiv_kes,synthetic,hazard_score_common,hazard_score_occasional,hazard_score_moderate,hazard_score_severe,hazard_score_extreme
+NBO-0002,Mathare 4A,Mathare,-1.2584,36.8554,informal_iron_sheet,126,146031.75,18400000,TRUE,0.91,0.84,0.72,0.55,0.38
+NBO-0091,Mathare North,Mathare,-1.2568,36.8581,permanent_masonry,510,141176.47,72000000,TRUE,0.88,0.80,0.66,0.50,0.31
+NBO-0218,South C Popo Rd,South C,-1.3172,36.8252,permanent_masonry,344,140988.37,48500000,TRUE,0.74,0.62,0.51,0.37,0.22
+NBO-0337,Kibera Lindi,Kibera,-1.3121,36.7893,informal_iron_sheet,96,133333.33,12800000,TRUE,0.71,0.60,0.47,0.33,0.19
+NBO-0572,Embakasi Pipeline,Embakasi,-1.3168,36.8914,semi_permanent,190,129473.68,24600000,TRUE,0.67,0.55,0.43,0.30,0.16
+NBO-0594,Karen Miotoni,Karen,-1.3191,36.7128,permanent_masonry,620,152419.35,94500000,TRUE,0.18,0.12,0.08,0.04,0.01
