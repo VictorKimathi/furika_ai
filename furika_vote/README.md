@@ -45,8 +45,11 @@ npm start
 
 The chatbot sends selected upload IDs to Flask. Flask retrieves parsed rows and document text and tries Claude, then Gemini, then OpenAI GPT-5.6 Luna. If none is available, chat returns a labelled data-only summary instead of pretending it used AI.
 
+The active chat, completed API answers, and right-hand review view are cached in this browser and restored after a refresh. If a refresh interrupts an in-flight chat request, its question remains in the thread with a **Retry response** button; it is not automatically sent twice. Pending portfolio approval is reloaded from Flask when the Workflow view opens. This cache is local to the browser, not synchronized across devices or browsers.
+
 When a user pastes a placement memorandum or selects one uploaded placement document, chat shows inspectable offer checks for hazard intensity, vulnerability, loss, accumulation and underwriting findings. Missing inputs appear as blocked checks, and the offer remains pending human review rather than being treated as an approved portfolio run.
 
 Each completed chatbot answer has a **Download PDF** action. The Kenya Re-branded report is generated in the browser and includes the question, structured answer, placement checks when present, evidence references, and review limitations. It does not change the workflow approval status.
 
-The Accumulation sidebar tab lets underwriters upload additional synthetic or redacted Nairobi insured-asset CSV/XLSX files, filter by upload, and inspect all-property counts and insured values by region. Its Google Maps region bubbles use backend centroids and counts; individual pins show a capped preview. A CSV template is available from the tab.
+The Accumulation sidebar tab lets underwriters upload additional synthetic or redacted Nairobi insured-asset CSV/XLSX files, filter by upload, and inspect property counts and insured values by region. Its Google Maps region bubbles use backend centroids and counts; all loaded properties with coordinates have individual pins. A CSV template is available from the tab.
+The Accumulation map now loads scored Nairobi reference locations and named hotspots as a fixed layer before any underwriter upload. Uploaded insured assets are separate green pins, with their own and reference susceptibility scores shown side by side. The reference's synthetic locations do not count as underwriter exposure on this tab. See [the Accumulation map plan](../backend/docs/accumulation-map-plan.md) for setup and limitations.

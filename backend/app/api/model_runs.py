@@ -7,6 +7,7 @@ from ..services import model_runs, run_metrics
 from ..services.run_trace import RunFailed
 from ..extensions import db
 from ..models import ModelRun
+from .auth import DUMMY_USER
 from .swagger_models import (
     decision_request,
     decision_response,
@@ -110,7 +111,7 @@ class ModelRunDecisionResource(Resource):
         """Approve the human-review gate or return the run for revision."""
         payload = request.get_json()
         try:
-            return model_runs.decide(run_id, payload["action"], payload.get("comment"))
+            return model_runs.decide(run_id, payload["action"], payload.get("comment"), decided_by=DUMMY_USER["name"])
         except (model_runs.RunError, RunFailed) as exc:
             _abort_with_trace(exc)
 

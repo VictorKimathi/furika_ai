@@ -1,6 +1,7 @@
 def register_namespaces(api):
     from .auth import ns as auth_namespace
     from .chat import chat_ns, chats_ns
+    from .decisions import ns as decisions_namespace
     from .health import ns as health_namespace
     from .locations import ns as locations_namespace
     from .model_runs import ns as model_runs_namespace
@@ -22,5 +23,6 @@ def register_namespaces(api):
         locations_namespace,
         chat_ns,
         chats_ns,
+        decisions_namespace,
     ):
         api.add_namespace(namespace)

@@ -288,3 +288,19 @@ class DocumentFact(TimestampMixin, db.Model):
     quote = db.Column(db.Text)
     confidence = db.Column(db.Float)
     verified = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class DecisionRecord(TimestampMixin, db.Model):
+    """The underwriting decision on one risk, with what it was based on: the numbers, the checks and the confidence shown."""
+
+    __tablename__ = "decision_records"
+
+    id = db.Column(db.String(36), primary_key=True, default=new_id)
+    portfolio_id = db.Column(db.String(64), nullable=True, index=True)
+    subject_type = db.Column(db.String(20), nullable=False)  # offer | model_run
+    subject_ref = db.Column(db.String(80), nullable=False, index=True)
+    subject_label = db.Column(db.String(255), nullable=False)
+    action = db.Column(db.String(20), nullable=False)  # approve | send_back
+    snapshot = db.Column(JSONType, nullable=False, default=dict)
+    comment = db.Column(db.Text)
+    decided_by = db.Column(db.String(160), nullable=False)

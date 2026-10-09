@@ -17,3 +17,10 @@
 .response-actions{flex-wrap:wrap}
 .response-actions button:disabled{opacity:.6;cursor:wait}
 .response-pdf-error{display:block;margin-top:5px;color:#9c3045;font-size:10px}
+.chat-offer-context{display:flex;align-items:center;gap:7px;margin-bottom:8px;padding:7px 10px;border:1px solid #cadce8;border-radius:7px;background:#f1f7fb;color:#214862;font-size:11px}
+.chat-offer-context>svg{flex:none;color:#176d97}
+.chat-offer-context span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-offer-context button{display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;color:#176d97;font-size:10px;font-weight:700;cursor:pointer}
+.chat-pending-request{display:flex;align-items:center;gap:7px;margin-top:8px;padding:8px 10px;border:1px solid #d4e0e8;border-radius:5px;background:#f5f9fc;color:#45667c;font-size:11px}
+.chat-pending-request span{flex:1}
+.chat-pending-request button{padding:5px 8px;border:1px solid #b9d0df;border-radius:4px;background:#fff;color:#175575;font-size:11px;font-weight:700;cursor:pointer}

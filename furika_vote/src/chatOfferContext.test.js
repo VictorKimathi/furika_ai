@@ -7,6 +7,7 @@ test('pasted offer remains the only source for a follow-up', () => {
   const current = { kind: 'pasted', messageIndex: 0 };
   assert.deepEqual(carriedOfferContext(current, messages, []), { offerText: 'A long placement offer' });
   assert.deepEqual(carriedOfferContext(current, messages, [{ id: 'csv-1' }]), {});
+  assert.deepEqual(carriedOfferContext(current, [], []), { offerText: '' });
 });
 
 test('uploaded offer stays attached by ID, while a new explicit source replaces it', () => {
@@ -18,6 +19,8 @@ test('uploaded offer stays attached by ID, while a new explicit source replaces 
 
 test('a newly pasted offer supersedes the previous offer', () => {
   const previous = { kind: 'upload', uploadId: 'old-offer' };
-  const next = offerContextAfterResponse({ offerChecks: {}, source: 'Pasted placement offer (contact details redacted)' }, 'x'.repeat(800), [], 8, previous);
+  const next = offerContextAfterResponse({ offerChecks: {}, source: 'Pasted placement offer (contact details redacted)' }, 'Placement reinsurance broker insured value. '.repeat(24), [], 8, previous);
   assert.deepEqual(next, { kind: 'pasted', messageIndex: 8 });
+  const followUp = offerContextAfterResponse({ offerChecks: {}, source: 'Pasted placement offer (contact details redacted)' }, 'Please focus on the basement. '.repeat(30), [], 10, next);
+  assert.deepEqual(followUp, next);
 });

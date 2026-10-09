@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   AlertTriangle,
+  FastForward,
+  RotateCcw,
   ArrowRight,
   BarChart3,
   Bot,
@@ -66,24 +68,30 @@ import './recent-chats.css';
 import './data-sources.css';
 import './readability.css';
 import './brand.css';
+import './chat-simple.css';
 import kenyaReLogo from './assets/kenya-re-logo-light.png';
 import kenyaReReportLogo from './assets/kenya-re-logo-light.png?inline';
 import FurikaMascot from './FurikaMascot.jsx';
 import PortfolioScreen from './PortfolioScreen.jsx';
-import AccumulationScreen from './AccumulationScreen.jsx';
 import { API_BASE_URL as BACKEND_URL, PORTFOLIO_ID, apiGet, apiRequest, describeError, log } from './api.js';
 import FormattedText from './FormattedText.jsx';
-import OfferChecks from './OfferChecks.jsx';
+import OfferWorkflowWorkspace from './OfferWorkflowWorkspace.jsx';
 import { carriedOfferContext, offerContextAfterResponse } from './chatOfferContext.js';
+import { deleteChat, persistActiveChat, restoreChatState, upsertChat, finishChatRequest } from './chatPersistence.js';
+import { RAIN_BY_TIER, rainTargets } from './mapRain.js';
 import StageDrawer from './StageMetrics.jsx';
+import RunStory from './RunStory.jsx';
+import { AnswerFooter, NeedFromYou, OfferDecision, RunDecision } from './ChatDecision.jsx';
+import Pipeline from './Pipeline.jsx';
+import { buildStory } from './runStory.js';
 
-// Scenario tiers on the map: common (rarest flood, widest footprint) in blue through to severe in red.
+// Rain is an illustrative visual emphasis for the selected susceptibility tier, not a rainfall forecast.
 const TIERS = [
-  { id: 'common', label: 'Common', range: '1 in 250', color: '#2a78d6', rain: 1 },
-  { id: 'occasional', label: 'Occasional', range: '1 in 100', color: '#1baf7a', rain: .8 },
-  { id: 'moderate', label: 'Moderate', range: '1 in 50', color: '#eda100', rain: .62 },
-  { id: 'severe', label: 'Severe', range: '1 in 25', color: '#e34948', rain: .46 },
-  { id: 'extreme', label: 'Extreme', range: '1 in 10', color: '#a3123f', rain: .32 },
+  { id: 'common', label: 'Common', range: '1 in 250', color: '#2a78d6', rain: RAIN_BY_TIER.common.intensity, rainLabel: RAIN_BY_TIER.common.label },
+  { id: 'occasional', label: 'Occasional', range: '1 in 100', color: '#1baf7a', rain: RAIN_BY_TIER.occasional.intensity, rainLabel: RAIN_BY_TIER.occasional.label },
+  { id: 'moderate', label: 'Moderate', range: '1 in 50', color: '#eda100', rain: RAIN_BY_TIER.moderate.intensity, rainLabel: RAIN_BY_TIER.moderate.label },
+  { id: 'severe', label: 'Severe', range: '1 in 25', color: '#e34948', rain: RAIN_BY_TIER.severe.intensity, rainLabel: RAIN_BY_TIER.severe.label },
+  { id: 'extreme', label: 'Extreme', range: '1 in 10', color: '#a3123f', rain: RAIN_BY_TIER.extreme.intensity, rainLabel: RAIN_BY_TIER.extreme.label },
 ];
 
 const HOTSPOTS = [
@@ -207,37 +215,29 @@ function Login({ onLogin }) {
   </main>;
 }
 
-function parseProperty(text) {
-  const amountMatch = text.match(/(?:kes\s*)?(\d+(?:\.\d+)?)\s*(m|million|b|billion)?/i);
-  let value = amountMatch ? Number(amountMatch[1]) : 25;
-  if (amountMatch?.[2]?.toLowerCase().startsWith('b')) value *= 1000;
-  const lower = text.toLowerCase();
-  const location = ['Mathare', 'Kibera', 'South C', 'Mukuru', 'Gikomba', 'Kilimani'].find((x) => lower.includes(x.toLowerCase())) || 'Nairobi';
-  const type = lower.includes('warehouse') ? 'Commercial warehouse' : lower.includes('informal') ? 'Informal settlement' : lower.includes('concrete') || lower.includes('apartment') ? 'Engineered concrete' : 'Residential masonry';
-  const hazard = location === 'Mathare' ? .88 : location === 'Mukuru' ? .84 : location === 'Kibera' ? .71 : .58;
-  const mdr = type === 'Informal settlement' ? 72 : type === 'Engineered concrete' ? 14 : type === 'Commercial warehouse' ? 41 : 38;
-  return { id: `AI-${Date.now().toString().slice(-5)}`, name: `${location} · Proposed asset`, location, type, value, hazard, mdr, loss: value * mdr / 100, lat: -1.2921, lng: 36.8219 };
-}
-
-function ExposurePreview({ asset, onConfirm, onCancel }) {
-  return <div className="exposure-preview"><div className="preview-head"><div><Sparkles size={15} /><strong>AI-structured exposure</strong></div><span>REVIEW REQUIRED</span></div>
-    <div className="preview-grid"><div><span>LOCATION</span><strong>{asset.location}</strong></div><div><span>OCCUPANCY</span><strong>{asset.type}</strong></div><div><span>INSURED VALUE</span><strong>KES {asset.value.toFixed(1)}M</strong></div><div><span>PROXY SCORE</span><strong>{asset.hazard.toFixed(2)} · assumed</strong></div><div><span>DAMAGE RATIO</span><strong>{asset.mdr}%</strong></div><div><span>MODELLED LOSS</span><strong className="danger">KES {asset.loss.toFixed(2)}M</strong></div></div>
-    <p><AlertTriangle size={13} /> Coordinates and hazard score require confirmation. No figures have been added to the portfolio yet.</p>
-    <div className="preview-actions"><button onClick={onCancel}>Discard</button><button onClick={onConfirm}><Check size={14} /> Confirm & recalculate</button></div>
-  </div>;
-}
-
-const THINKING_STAGES = [
-  { title: 'Understanding the request', detail: 'Classifying the underwriting question' },
-  { title: 'Retrieving model evidence', detail: 'Loading approved sources and portfolio context' },
-  { title: 'Running available checks', detail: 'Applying site model and underwriting rules where data permits' },
-  { title: 'Preparing the response', detail: 'Formatting evidence for an underwriter' },
-];
-
 const INITIAL_CHAT_MESSAGE = { role: 'assistant', content: "Hi, I'm **Furi**, the Furika Bot. Ask me about your portfolio, a property's flood risk or losses, or attach a file from the Data store with **Add context**." };
 
-function ThinkingTrace({ activeStep }) {
-  return <div className="thinking-trace"><header><div><span className="thinking-orb"><Sparkles size={14}/></span><span><strong>Furika AI is working</strong><small>Calculated checks and any blocked steps will appear in the response</small></span></div></header><div className="thinking-stages">{THINKING_STAGES.map((stage,index)=>{const state=index<activeStep?'done':index===activeStep?'active':'waiting';return <div className={state} key={stage.title}><i>{state==='done'?<Check size={11}/>:state==='active'?<span/>:index+1}</i><span><strong>{stage.title}</strong><small>{stage.detail}</small></span></div>})}</div></div>;
+function ChatAnswer({ content }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = content?.length > 1100;
+  return <div className={`chat-answer ${long && !expanded ? 'collapsed' : ''}`}><div className="chat-answer-content"><FormattedText text={content}/></div>{long && <button type="button" onClick={() => setExpanded((value) => !value)}>{expanded ? 'Show less' : 'Read full answer'}</button>}</div>;
+}
+
+function ChatWelcome({ hasFiles, hasResults, onPrompt, onAddFile }) {
+  const prompts = hasResults
+    ? ['Summarise my portfolio results', 'Where is loss concentrated?', 'What needs my review?']
+    : hasFiles
+    ? ['Summarise my uploaded data', 'Which properties need attention?', 'What should I review first?']
+    : ['How do I assess a property?', 'What can I ask about flood risk?', 'What should I upload?'];
+  return <div className="chat-welcome"><span className="chat-welcome-icon"><FurikaMascot size={38} animated/></span><h2>What would you like to know?</h2><p>Ask a question about an offer, a property, or your portfolio. Furi will use the information you provide.</p><div className="chat-welcome-prompts">{prompts.map((prompt) => <button type="button" key={prompt} onClick={() => onPrompt(prompt)}>{prompt}<ArrowRight size={15}/></button>)}</div>{!hasFiles && !hasResults && <button className="chat-welcome-upload" type="button" onClick={onAddFile}><FileUp size={16}/> Add a file to ask about</button>}</div>;
+}
+
+function ChatSourcePicker({ dataSources, selectedIds, onToggle, onClose, onUploadClick, attested, setAttested, uploadError }) {
+  const [tab, setTab] = useState(dataSources.length ? 'saved' : 'device');
+  return <div className="context-picker chat-source-picker" role="dialog" aria-label="Add a file to chat"><header><div><FileText size={18}/><span><strong>Add a file</strong><small>Choose what Furi should use for your next question</small></span></div><button type="button" onClick={onClose} aria-label="Close file picker"><X size={17}/></button></header>
+    <div className="chat-source-tabs" role="tablist" aria-label="File source"><button type="button" role="tab" aria-selected={tab === 'saved'} className={tab === 'saved' ? 'active' : ''} onClick={() => setTab('saved')}>Saved files ({dataSources.length})</button><button type="button" role="tab" aria-selected={tab === 'device'} className={tab === 'device' ? 'active' : ''} onClick={() => setTab('device')}>Upload new</button></div>
+    {tab === 'saved' ? <><div className="context-library">{dataSources.length ? dataSources.map((source) => <button type="button" key={source.id} className={selectedIds.includes(source.id) ? 'selected' : ''} onClick={() => onToggle(source.id)} aria-pressed={selectedIds.includes(source.id)}><i>{sourceIcon(source.extension, 16)}</i><span><strong>{source.name}</strong><small>{source.processing ? 'Processing…' : `${source.extension} · ${formatFileSize(source.size)}`}</small></span><em>{selectedIds.includes(source.id) ? <Check size={13}/> : <Plus size={13}/>}</em></button>) : <div className="chat-no-files"><FileText size={23}/><strong>No saved files yet</strong><button type="button" onClick={() => setTab('device')}>Upload your first file</button></div>}</div><footer><span>{selectedIds.length} of 5 selected</span><button type="button" onClick={onClose}>Done</button></footer></> : <div className="chat-upload-choice"><p>For privacy, upload only synthetic or redacted data.</p><div className="context-attestation"><span>My file contains:</span><button type="button" className={attested === 'synthetic' ? 'active' : ''} onClick={() => setAttested('synthetic')}>Synthetic data</button><button type="button" className={attested === 'redacted' ? 'active' : ''} onClick={() => setAttested('redacted')}>Redacted data</button></div><button type="button" className="upload-context" disabled={!attested} onClick={onUploadClick}><FileUp size={18}/><span><strong>Choose files from my device</strong><small>PDF, Word, CSV, Excel, or text</small></span><ChevronRight size={17}/></button>{!attested && <small className="chat-upload-hint">Select a data type above to continue.</small>}{uploadError && <p className="context-upload-error" role="alert">{uploadError}</p>}</div>}
+  </div>;
 }
 
 function citationLabel(citation) {
@@ -247,69 +247,56 @@ function citationLabel(citation) {
   return name;
 }
 
-function ResponseActions({ message, reportReady, onOpenView, workflow, onReviewRun, offerChecks }) {
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const [pdfError, setPdfError] = useState('');
-  const pending = workflow?.status === 'review';
-  const downloadPdf = async () => {
-    setPdfBusy(true);
-    setPdfError('');
-    try {
-      const { downloadChatReportPdf } = await import('./chatReportPdf.js');
-      downloadChatReportPdf(message, { logoDataUrl: kenyaReReportLogo, portfolioId: PORTFOLIO_ID, generatedAt: message.createdAt || new Date() });
-    } catch (error) { setPdfError(error.message || 'Could not create the PDF report.'); }
-    finally { setPdfBusy(false); }
-  };
-  return <>
-    <div className="response-actions">{offerChecks ? <span><ShieldCheck size={13}/> Offer checks shown above · human review required</span> : <>{reportReady && <span><CheckCircle2 size={13}/> Report ready</span>}{pending ? <button className="review-run" onClick={() => onReviewRun(workflow)}><ShieldCheck size={13}/> Review & approve {workflow.runId}</button> : <button onClick={()=>onOpenView('workflow', !reportReady)}><Workflow size={13}/> View workflow</button>}</>}<button onClick={()=>onOpenView('map')}><Map size={13}/> Open map</button><button type="button" onClick={downloadPdf} disabled={pdfBusy} title="Download this answer as a Kenya Re PDF report"><Download size={13}/>{pdfBusy ? 'Preparing PDF…' : 'Download PDF'}</button></div>
-    {pdfError && <small className="response-pdf-error" role="alert">{pdfError}</small>}
-  </>;
+// One click from the chat to the portfolio results, whatever state they are in.
+function ResultsBanner({ status, onOpen }) {
+  const [text, action] = status === 'review' ? ['Portfolio results are waiting for your decision', 'Review'] : status === 'approved' ? ['Portfolio results are ready', 'View results'] : ['No portfolio results yet', 'Calculate'];
+  return <div className={`chat-context-banner results-${status}`}>{status === 'review' ? <UserRound size={16}/> : <ShieldCheck size={16}/>}<span>{text}</span><button type="button" onClick={onOpen}>{action} <ArrowRight size={14}/></button></div>;
 }
 
-function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWorkflowPending, onOfferLocation, reportReady, portfolioSummary, dataSources, onUploadFiles, attested, setAttested }) {
-  const [messages, setMessages] = useState([INITIAL_CHAT_MESSAGE]);
-  const [activeChatId, setActiveChatId] = useState(() => `chat-${Date.now()}`);
-  const [recentChats, setRecentChats] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('furika-recent-chats') || '[]'); } catch { return []; }
-  });
+function ChatPanel({ onRunDecided, selectedLocation, addedAssets, onAddAsset, onOpenView, onWorkflowPending, onOfferReview, reportReady, portfolioSummary, latestRun, dataSources, onUploadFiles, attested, setAttested }) {
+  const [restoredChat] = useState(() => restoreChatState(localStorage, INITIAL_CHAT_MESSAGE));
+  const [messages, setMessages] = useState(restoredChat.messages);
+  const [activeChatId, setActiveChatId] = useState(restoredChat.activeChatId);
+  const [recentChats, setRecentChats] = useState(restoredChat.recentChats);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [input, setInput] = useState('');
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [input, setInput] = useState(() => {
+    const draft = readStorage('furika-chat-draft', {});
+    return draft.chatId === restoredChat.activeChatId && typeof draft.text === 'string' ? draft.text : '';
+  });
   const [busy, setBusy] = useState(false);
-  const [thinkingStep, setThinkingStep] = useState(-1);
-  const [preview, setPreview] = useState(null);
   const [contextOpen, setContextOpen] = useState(false);
   const [attachedSourceIds, setAttachedSourceIds] = useState([]);
-  const [activeOffer, setActiveOffer] = useState(null);
+  const [activeOffer, setActiveOffer] = useState(restoredChat.offerContext);
   const [uploadError, setUploadError] = useState('');
   const thread = useRef(null);
   const contextFileInput = useRef(null);
-  const reportDelivered = useRef(false);
-  const thinkingTimer = useRef(null);
+  const activeChatIdRef = useRef(activeChatId);
 
-  useEffect(() => { thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: 'smooth' }); }, [messages, preview, busy]);
-  useEffect(() => () => window.clearInterval(thinkingTimer.current), []);
+  useEffect(() => { thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: 'smooth' }); }, [messages, busy]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    activeChatIdRef.current = activeChatId;
+    persistActiveChat(localStorage, activeChatId);
+  }, [activeChatId]);
+  useEffect(() => { writeStorage('furika-chat-draft', { chatId: activeChatId, text: input }); }, [activeChatId, input]);
+
+  useLayoutEffect(() => {
     const firstQuestion = messages.find((message) => message.role === 'user');
     if (!firstQuestion) return;
     const entry = { id: activeChatId, title: firstQuestion.content.slice(0, 52), updatedAt: Date.now(), messages, offerContext: activeOffer };
-    setRecentChats((current) => {
-      const next = [entry, ...current.filter((chat) => chat.id !== activeChatId)].slice(0, 12);
-      localStorage.setItem('furika-recent-chats', JSON.stringify(next));
-      return next;
-    });
+    setRecentChats(upsertChat(localStorage, entry));
   }, [messages, activeChatId, activeOffer]);
 
   useEffect(() => {
-    if (!reportReady) {
-      reportDelivered.current = false;
-      setMessages((current) => current.filter((message) => !message.summary));
-      return;
+    if (activeOffer) {
+      const lastReview = [...messages].reverse().find((message) => message.offerChecks);
+      if (lastReview) onOfferReview?.(lastReview, { restoring: true });
+    } else {
+      const latestWorkflow = [...messages].reverse().find((message) => message.workflow);
+      if (latestWorkflow?.workflow?.status === 'review') onWorkflowPending?.(latestWorkflow.workflow, { restoring: true });
     }
-    if (reportDelivered.current) return;
-    reportDelivered.current = true;
-    setMessages((current) => [...current, { role: 'assistant', content: `The model run passed human review. ${portfolioSummary?.propertyCount ?? 0} portfolio properties are available with approved results. Total insured value: KES ${((portfolioSummary?.totalInsuredValueKes || 0) / 1e9).toFixed(3)}B. Central annual loss: KES ${((portfolioSummary?.portfolioAalKes || 0) / 1e6).toFixed(2)}M.`, summary: true, source: `Approved workflow · ${PORTFOLIO_ID}`, actions: true }]);
-  }, [reportReady, portfolioSummary]);
+  }, []);
 
   useEffect(() => {
     if (!selectedLocation) return;
@@ -324,70 +311,100 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     return 'The model follows Hazard → Vulnerability → Exposure → Financial Loss. Current results use 600 synthetic assets with KES 4.82B total exposure. Under the extreme proxy scenario, gross modelled loss is KES 1.642B (34.1%). These are prototype estimates, not observed claims.';
   };
 
-  const submit = async (value = input, location = null) => {
+  const submit = async (value = input, location = null, retry = null) => {
     const text = value.trim();
-    if (!text || busy || dataSources.some((source) => attachedSourceIds.includes(source.id) && source.processing)) return;
-    const selectedSources = dataSources.filter((source) => attachedSourceIds.includes(source.id));
-    const context = { portfolioId: PORTFOLIO_ID, uploadIds: selectedSources.map((source) => source.id), ...carriedOfferContext(activeOffer, messages, selectedSources) };
-    const messageIndex = messages.length;
+    if (!text || busy || (!retry && dataSources.some((source) => attachedSourceIds.includes(source.id) && source.processing))) return;
+    const selectedSources = dataSources.filter((source) => (retry?.request?.context?.uploadIds || attachedSourceIds).includes(source.id));
+    const context = retry?.request?.context || { portfolioId: PORTFOLIO_ID, uploadIds: selectedSources.map((source) => source.id), ...carriedOfferContext(activeOffer, messages, selectedSources) };
+    const request = retry?.request || { message: text, mode: 'analysis', context };
+    const requestId = retry?.requestId || (globalThis.crypto?.randomUUID?.() ?? `request-${Date.now()}-${Math.random()}`);
+    const messageIndex = retry?.messageIndex ?? messages.length;
+    const chatId = activeChatId;
+    if (selectedSources.length) { setActiveOffer(null); onOfferReview?.(null); }
     if (location?.kind === 'hotspot') context.hotspotId = location.id;
     else if (location?.id) context.propertyId = location.id;
     setInput('');
     setAttachedSourceIds([]);
     setContextOpen(false);
-    setMessages((current) => [...current, { role: 'user', content: text, attachments: selectedSources.map((source) => source.name) }]);
+    if (!retry) setMessages((current) => [...current, { role: 'user', content: text, attachments: selectedSources.map((source) => source.name), request, requestId, pending: true, createdAt: new Date().toISOString() }]);
     setBusy(true);
-    setThinkingStep(0);
-    const startedAt = Date.now();
-    window.clearInterval(thinkingTimer.current);
-    thinkingTimer.current = window.setInterval(() => setThinkingStep((step) => Math.min(step + 1, THINKING_STAGES.length - 1)), 650);
-    const completeThinking = async () => {
-      const remaining = Math.max(0, 2500 - (Date.now() - startedAt));
-      if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
-      window.clearInterval(thinkingTimer.current);
-      setThinkingStep(-1);
-      setBusy(false);
-    };
     try {
-      const data = await apiRequest('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, mode: 'analysis', context }) });
-      await completeThinking();
-      setActiveOffer(offerContextAfterResponse(data, text, selectedSources, messageIndex, activeOffer));
-      setMessages((current) => [...current, { role: 'assistant', content: data.answer, question: text, reportAttachments: selectedSources.map((source) => source.name), createdAt: new Date().toISOString(), source: data.source || 'Furika model context', citations: data.citations || [], workflow: data.workflow || null, offerChecks: data.offerChecks || null, provider: data.provider, model: data.model, actions: true }]);
-      if (data.workflow?.status === 'review') onWorkflowPending(data.workflow);
-      if (data.asset?.kind === 'offer' && data.asset.lat != null) onOfferLocation?.(data.asset);
+      const data = await apiRequest('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
+      const nextOffer = offerContextAfterResponse(data, text, selectedSources, messageIndex, activeOffer);
+      const responseMessage = { role: 'assistant', content: data.answer, question: text, reportAttachments: selectedSources.map((source) => source.name), createdAt: new Date().toISOString(), source: data.source || 'Furika model context', citations: data.citations || [], workflow: data.workflow || null, decision: data.decision || null, offerChecks: data.offerChecks || null, asset: data.asset || null, provider: data.provider, model: data.model, actions: true };
+      const saved = finishChatRequest(localStorage, chatId, requestId, responseMessage, nextOffer);
+      if (activeChatIdRef.current === chatId) {
+        setActiveOffer(nextOffer);
+        setMessages(saved?.messages || ((current) => [...current.map((message) => message.requestId === requestId ? { ...message, pending: false, request: undefined } : message), responseMessage]));
+        if (data.workflow?.status === 'review') onWorkflowPending(data.workflow);
+        if (data.offerChecks) onOfferReview?.(data);
+      }
     } catch (error) {
-      await completeThinking();
-      setMessages((current) => [...current, { role: 'assistant', content: error.message, source: 'Flask backend' }]);
-    }
+      const errorMessage = { role: 'assistant', content: error.message, source: 'Flask backend', createdAt: new Date().toISOString(), failed: true, question: text, request, requestId };
+      const saved = finishChatRequest(localStorage, chatId, requestId, errorMessage);
+      if (activeChatIdRef.current === chatId) setMessages(saved?.messages || ((current) => [...current.map((message) => message.requestId === requestId ? { ...message, pending: false, request: undefined } : message), errorMessage]));
+    } finally { setBusy(false); }
   };
 
-  const confirmAsset = () => {
-    onAddAsset(preview);
-    setMessages((current) => [...current, { role: 'assistant', content: `${preview.name} was added as synthetic exposure. Portfolio insured value increased by KES ${preview.value.toFixed(1)}M and its severe-scenario modelled loss contribution is KES ${preview.loss.toFixed(2)}M.`, source: 'AI-derived exposure · confirmed by user' }]);
-    setPreview(null);
+  const retryFailed = (index) => {
+    const failed = messages[index];
+    if (!failed?.request || busy) return;
+    setMessages((current) => current.filter((_, i) => i !== index).map((message) => message.role === 'user' && message.requestId === failed.requestId ? { ...message, pending: true, request: failed.request } : message));
+    submit(failed.question, null, { request: failed.request, requestId: failed.requestId, messageIndex: index });
   };
 
   const startNewChat = () => {
-    setActiveChatId(`chat-${Date.now()}`);
+    if (busy) return;
+    const nextId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    activeChatIdRef.current = nextId;
+    setActiveChatId(nextId);
     setMessages([INITIAL_CHAT_MESSAGE]);
     setActiveOffer(null);
-    setPreview(null);
+    onOfferReview?.(null);
+    setInput('');
+    setAttachedSourceIds([]);
+    setContextOpen(false);
     setHistoryOpen(false);
+    setClearConfirmOpen(false);
+  };
+
+  const clearCurrentChat = () => {
+    if (busy) return;
+    setRecentChats(deleteChat(localStorage, activeChatId));
+    setMessages([INITIAL_CHAT_MESSAGE]);
+    setActiveOffer(null);
+    onOfferReview?.(null);
+    setInput('');
+    writeStorage('furika-chat-draft', { chatId: activeChatId, text: '' });
+    setAttachedSourceIds([]);
+    setUploadError('');
+    setContextOpen(false);
+    setHistoryOpen(false);
+    setClearConfirmOpen(false);
   };
 
   const openRecentChat = (chat) => {
+    if (busy) return;
+    activeChatIdRef.current = chat.id;
     setActiveChatId(chat.id);
     setMessages(chat.messages?.length ? chat.messages : [INITIAL_CHAT_MESSAGE]);
     setActiveOffer(chat.offerContext || null);
-    setPreview(null);
+    const review = chat.offerContext ? [...(chat.messages || [])].reverse().find((message) => message.offerChecks) : null;
+    onOfferReview?.(review || null);
+    if (!review) {
+      const latestWorkflow = [...(chat.messages || [])].reverse().find((message) => message.workflow);
+      if (latestWorkflow?.workflow?.status === 'review') onWorkflowPending?.(latestWorkflow.workflow);
+    }
+    setInput('');
+    setAttachedSourceIds([]);
+    setContextOpen(false);
     setHistoryOpen(false);
+    setClearConfirmOpen(false);
   };
 
   const removeRecentChat = (event, id) => {
     event.stopPropagation();
-    const next = recentChats.filter((chat) => chat.id !== id);
-    setRecentChats(next);
-    localStorage.setItem('furika-recent-chats', JSON.stringify(next));
+    setRecentChats(deleteChat(localStorage, id));
     if (id === activeChatId) startNewChat();
   };
 
@@ -403,52 +420,61 @@ function ChatPanel({ selectedLocation, addedAssets, onAddAsset, onOpenView, onWo
     setAttachedSourceIds((current) => current.includes(sourceId) ? current.filter((id) => id !== sourceId) : current.length < 5 ? [...current, sourceId] : current);
   };
   const selectedSourceProcessing = dataSources.some((source) => attachedSourceIds.includes(source.id) && source.processing);
+  const hasChatContent = messages.some((message) => message.role === 'user') || Boolean(input || activeOffer || attachedSourceIds.length);
 
   return <section className="chat-panel">
-    <header className="panel-header"><div className="panel-title"><div className="bot-avatar"><FurikaMascot size={34} animated/></div><span><strong>Furika Bot <i /></strong><small>Your flood-risk analyst · Hazard → Vulnerability → Exposure → Loss</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Recent chats" onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/><span>Recent</span></button><button title="New conversation" onClick={startNewChat}><Plus size={16}/></button></div></header>
+    <header className="panel-header"><div className="panel-title"><div className="bot-avatar"><FurikaMascot size={34} animated/></div><span><strong>Ask Furi</strong><small>Your flood-risk assistant</small></span></div><div className="chat-header-actions"><button className={historyOpen?'active':''} title="Past chats" onClick={()=>{setHistoryOpen(!historyOpen);setClearConfirmOpen(false);}}><History size={16}/><span>Chats</span></button><button title="Start a new chat" disabled={busy} onClick={startNewChat}><Plus size={16}/><span>New</span></button><button className={clearConfirmOpen?'active clear-chat-trigger':'clear-chat-trigger'} title="Clear current chat" disabled={busy || !hasChatContent} onClick={()=>{setClearConfirmOpen(!clearConfirmOpen);setHistoryOpen(false);}}><Trash2 size={16}/><span>Clear</span></button><button title="Open the map" onClick={() => onOpenView('map')}><Map size={16}/><span>Map</span></button></div></header>
+    {clearConfirmOpen && <div className="chat-clear-confirm" role="alertdialog" aria-labelledby="clear-chat-title"><AlertTriangle size={17}/><span><strong id="clear-chat-title">Clear this chat?</strong><small>This removes its messages and draft from recent chats.</small></span><button type="button" onClick={()=>setClearConfirmOpen(false)}>Cancel</button><button type="button" className="confirm" onClick={clearCurrentChat}>Clear</button></div>}
     {historyOpen && <aside className="recent-chats"><div className="recent-chats-head"><div><History size={15}/><strong>Recent chats</strong></div><button onClick={()=>setHistoryOpen(false)}><X size={15}/></button></div><button className="new-chat-button" onClick={startNewChat}><Plus size={14}/> New analysis</button><div className="recent-chat-list">{recentChats.length?recentChats.map((chat)=><button key={chat.id} className={chat.id===activeChatId?'active':''} onClick={()=>openRecentChat(chat)}><MessageSquareText size={14}/><span><strong>{chat.title}</strong><small>{new Date(chat.updatedAt).toLocaleDateString('en-KE',{month:'short',day:'numeric'})} · {new Date(chat.updatedAt).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</small></span><i onClick={(event)=>removeRecentChat(event,chat.id)} title="Delete chat"><Trash2 size={13}/></i></button>):<div className="no-recent-chats"><MessageSquareText size={20}/><strong>No recent chats</strong><span>Your completed conversations will appear here.</span></div>}</div></aside>}
     <div className="chat-thread" ref={thread}>
-      <div className="analyst-banner"><Sparkles size={15} /><div><strong>{activeOffer ? 'Single-offer review active' : portfolioSummary?.status === 'approved' ? 'Approved portfolio results available' : 'Dataset-grounded analyst'}</strong><span>{activeOffer ? 'Follow-up questions use this offer only; choose another source or clear it to switch.' : 'Select a data source to ask about its uploaded contents.'}</span></div></div>
-      {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role}`}>
-        <div className="message-meta">{message.role === 'assistant' ? <span className="bot-meta"><FurikaMascot size={16}/> FURIKA BOT</span> : 'DR. A. OMONDI'} <span>· just now</span></div>
-        <div className="message-bubble">{message.role === 'assistant' ? <FormattedText text={message.content}/> : <p>{message.content}</p>}{message.offerChecks && <OfferChecks report={message.offerChecks}/>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.source && <small className="message-source"><FileText size={11} /> {message.source}{message.citations?.length > 0 && ` · ${[...new Set(message.citations.map(citationLabel))].filter((label) => label !== message.source).slice(0, 4).join(', ')}`}</small>}{message.actions && <ResponseActions message={{ ...message, question: message.question || (message.summary ? null : messages.slice(0, index).reverse().find((item) => item.role === 'user')?.content), reportAttachments: message.reportAttachments || messages[index - 1]?.attachments }} reportReady={reportReady} onOpenView={onOpenView} workflow={message.workflow} onReviewRun={onWorkflowPending} offerChecks={message.offerChecks}/>}</div>
+      {!activeOffer && <ResultsBanner status={latestRun?.status === 'review' ? 'review' : portfolioSummary?.status === 'approved' ? 'approved' : 'none'} onOpen={() => onOpenView('workflow')}/>}
+      {messages.length === 1 && messages[0].role === 'assistant' && messages[0].content === INITIAL_CHAT_MESSAGE.content && <ChatWelcome hasFiles={dataSources.length > 0} hasResults={portfolioSummary?.status === 'approved'} onPrompt={submit} onAddFile={() => setContextOpen(true)}/>}
+      {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`message ${message.role} ${index === 0 && message.content === INITIAL_CHAT_MESSAGE.content ? 'chat-intro-message' : ''}`}>
+        <div className="message-meta">{message.role === 'assistant' ? <span className="bot-meta"><FurikaMascot size={16}/> Furi</span> : 'You'}{message.createdAt && <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</time>}</div>
+        <div className="message-bubble">{message.role === 'assistant' ? <ChatAnswer content={message.content}/> : <p>{message.content}</p>}{message.pending && !busy && <div className="chat-pending-request"><Clock3 size={13}/><span>The page refreshed before the answer was saved.</span>{message.request && <button type="button" onClick={() => submit(message.content, null, { request: message.request, requestId: message.requestId, messageIndex: index })}>Retry</button>}</div>}{message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((name) => <span key={name}><FileText size={11}/>{name}</span>)}</div>}{message.role === 'assistant' && (() => {
+          const reportMessage = { ...message, question: message.question || messages.slice(0, index).reverse().find((item) => item.role === 'user')?.content, reportAttachments: message.reportAttachments || messages[index - 1]?.attachments };
+          if (message.failed) return <NeedFromYou message={message} onRetry={() => retryFailed(index)} onAddFile={() => setContextOpen(true)}/>;
+          if (message.decision) return <OfferDecision message={message} reportMessage={reportMessage} onOpenView={onOpenView}/>;
+          if (message.workflow?.runId) return <RunDecision message={message} reportMessage={reportMessage} onOpenView={onOpenView} onRunDecided={onRunDecided}/>;
+          return message.actions ? <AnswerFooter message={message} reportMessage={reportMessage}/> : null;
+        })()}</div>
       </div>)}
-      {preview && <ExposurePreview asset={preview} onConfirm={confirmAsset} onCancel={() => setPreview(null)} />}
-      {busy && <ThinkingTrace activeStep={thinkingStep}/>}
+      {busy && <div className="chat-waiting" role="status"><span className="chat-waiting-dots" aria-hidden="true"><i/><i/><i/></span>Furi is checking your question…</div>}
       {!!addedAssets.length && <div className="portfolio-update"><Database size={14} /> {addedAssets.length} AI-derived synthetic {addedAssets.length === 1 ? 'asset' : 'assets'} added this session</div>}
     </div>
-    <div className="quick-prompts"><span>QUICK QUERIES</span>{['Explain the EP curve','Compare Kibera and Mathare','Show model limitations'].map((q) => <button key={q} onClick={() => submit(q)}>{q}</button>)}</div>
     <div className="chat-composer">
-      {activeOffer && <div className="chat-offer-context"><ShieldCheck size={14}/><span>Reviewing one offer: <strong>{activeOffer.kind === 'upload' ? activeOffer.name : 'pasted placement offer'}</strong></span><button type="button" onClick={() => setActiveOffer(null)}><X size={12}/> Clear</button></div>}
+      {activeOffer && <div className="chat-offer-context"><ShieldCheck size={14}/><span>Reviewing one offer: <strong>{activeOffer.kind === 'upload' ? activeOffer.name : 'pasted placement offer'}</strong></span><button type="button" onClick={() => { setActiveOffer(null); onOfferReview?.(null); }}><X size={12}/> Clear</button></div>}
       {attachedSourceIds.length > 0 && <div className="attached-sources">{dataSources.filter((source) => attachedSourceIds.includes(source.id)).map((source) => <span key={source.id}>{sourceIcon(source.extension, 12)}<strong>{source.name}</strong><button title={`Remove ${source.name}`} onClick={() => toggleAttachedSource(source.id)}><X size={11}/></button></span>)}</div>}
-      <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="Ask about an uploaded dataset, portfolio property, or workflow result…" />
-      <div className="composer-actions"><button className={contextOpen ? 'context-trigger active' : 'context-trigger'} onClick={() => setContextOpen(!contextOpen)}><Plus size={14}/> Add context</button><small>{selectedSourceProcessing ? 'Waiting for file processing…' : 'Shift+Enter for new line'}</small><button className="analyse-button" onClick={() => submit()} disabled={!input.trim() || busy || selectedSourceProcessing}>Analyse <Send size={14}/></button></div>
+      <textarea aria-label="Ask Furi a question" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder={activeOffer ? 'Ask about this offer…' : 'Ask a question about flood risk…'} />
+      <div className="composer-actions"><button type="button" className={contextOpen ? 'context-trigger active' : 'context-trigger'} onClick={() => setContextOpen(!contextOpen)}><Plus size={16}/> Add file{attachedSourceIds.length > 0 ? ` (${attachedSourceIds.length})` : ''}</button><small>{selectedSourceProcessing ? 'File is still processing…' : 'Enter to send · Shift+Enter for a new line'}</small><button type="button" className="analyse-button" onClick={() => submit()} disabled={!input.trim() || busy || selectedSourceProcessing}>Send <Send size={15}/></button></div>
       <input ref={contextFileInput} className="hidden-file-input" type="file" multiple onChange={uploadChatFiles}/>
-      {contextOpen && <div className="context-picker"><header><div><Database size={15}/><span><strong>Add data source</strong><small>Choose up to five uploaded files</small></span></div><button onClick={() => setContextOpen(false)}><X size={14}/></button></header><div className="context-attestation"><span>New files contain only:</span><button className={attested === 'synthetic' ? 'active' : ''} onClick={() => setAttested('synthetic')}>Synthetic data</button><button className={attested === 'redacted' ? 'active' : ''} onClick={() => setAttested('redacted')}>Redacted data</button></div><button className="upload-context" disabled={!attested} onClick={() => contextFileInput.current?.click()}><FileUp size={17}/><span><strong>Upload from this device</strong><small>{attested ? 'PDF, Word, CSV, Excel, text, or any other file' : 'Select synthetic or redacted above first'}</small></span><ChevronRight size={14}/></button>{uploadError && <p className="context-upload-error">{uploadError}</p>}<div className="context-library-title"><span>UPLOADED SOURCES</span><em>{dataSources.length}</em></div><div className="context-library">{dataSources.length ? dataSources.map((source) => <button key={source.id} className={attachedSourceIds.includes(source.id) ? 'selected' : ''} onClick={() => toggleAttachedSource(source.id)}><i>{sourceIcon(source.extension, 15)}</i><span><strong>{source.name}</strong><small>{source.extension} · {formatFileSize(source.size)}</small></span><em>{attachedSourceIds.includes(source.id) ? <Check size={12}/> : <Plus size={12}/>}</em></button>) : <p>No uploaded sources yet.</p>}</div></div>}
+      {contextOpen && <ChatSourcePicker dataSources={dataSources} selectedIds={attachedSourceIds} onToggle={toggleAttachedSource} onClose={() => setContextOpen(false)} onUploadClick={() => contextFileInput.current?.click()} attested={attested} setAttested={setAttested} uploadError={uploadError}/>}
     </div>
   </section>;
 }
 
 const WORKFLOW_NODES = [
-  { id: 'hazard', step: '01', title: 'Data validation', subtitle: 'Schema + ordering checks', icon: Database, x: 9, y: 41, type: 'data', detail: 'Validate coordinates, structural classes, insured values and all five 0–1 scores before any modelling. Invalid rows stop the run instead of being guessed.', source: 'Confirmed uploaded portfolio rows' },
-  { id: 'quality', step: '02', title: 'Hazard modelling', subtitle: 'Proxy depth + diagnostics', icon: Waves, x: 25, y: 15, type: 'agent', detail: 'Convert the supplied susceptibility scores into scenario depth using documented model assumptions.', source: 'Uploaded hazard scores · model assumptions' },
-  { id: 'vulnerability', step: '03', title: 'Vulnerability mapping', subtitle: 'MDR by structural class', icon: TrendingUp, x: 25, y: 66, type: 'model', detail: 'Apply documented, adapted damage functions by construction class. Parameters are assumptions informed by JRC/Huizinga curves.', source: 'JRC/Huizinga reference curves' },
-  { id: 'exposure', step: '04', title: 'Exposure join', subtitle: 'Confirmed portfolio assets', icon: TableProperties, x: 44, y: 41, type: 'data', detail: 'Join uploaded hazard scores and structural vulnerability to confirmed portfolio properties.', source: 'Portfolio database' },
-  { id: 'loss', step: '05', title: 'Financial loss engine', subtitle: 'MDR × insured value', icon: BarChart3, x: 61, y: 41, type: 'model', detail: 'Calculate loss for every property and aggregate by scenario. Validate that losses increase monotonically with severity.', source: 'Deterministic model calculation' },
-  { id: 'intelligence', step: '06', title: 'AI intelligence', subtitle: 'Source-grounded briefing', icon: Sparkles, x: 77, y: 17, type: 'ai', detail: 'The chatbot can explain selected uploaded sources and approved portfolio outputs through the backend.', source: 'Flask chat · Gemini or Claude' },
-  { id: 'review', step: '07', title: 'Human review gate', subtitle: 'Approval required', icon: UserRound, x: 77, y: 66, type: 'human', detail: 'A catastrophe modeller reviews sources, assumptions, synthetic records and drainage limitations before approving the run.', source: 'Human-in-the-loop control' },
-  { id: 'publish', step: '08', title: 'Approved model run', subtitle: 'Underwriter-ready output', icon: CheckCircle2, x: 92, y: 41, type: 'output', detail: 'Release the approved loss table, EP curve and risk briefing. Unapproved runs remain drafts and cannot be exported.', source: 'Controlled model output' },
+  { id: 'hazard', step: '01', title: 'Check uploaded data', subtitle: 'Locations and values', icon: Database, x: 9, y: 41, type: 'data', detail: 'Validate coordinates, structural classes, insured values and all five 0–1 scores before any modelling. Invalid rows stop the run instead of being guessed.', source: 'Confirmed uploaded portfolio rows' },
+  { id: 'quality', step: '02', title: 'Flood exposure', subtitle: 'Scenario scores', icon: Waves, x: 25, y: 15, type: 'agent', detail: 'Convert the supplied susceptibility scores into scenario depth using documented model assumptions.', source: 'Uploaded hazard scores · model assumptions' },
+  { id: 'vulnerability', step: '03', title: 'Building damage', subtitle: 'By construction type', icon: TrendingUp, x: 25, y: 66, type: 'model', detail: 'Apply documented, adapted damage functions by construction class. Parameters are assumptions informed by JRC/Huizinga curves.', source: 'JRC/Huizinga reference curves' },
+  { id: 'exposure', step: '04', title: 'Assets in scope', subtitle: 'Confirmed properties', icon: TableProperties, x: 44, y: 41, type: 'data', detail: 'Join uploaded hazard scores and structural vulnerability to confirmed portfolio properties.', source: 'Portfolio database' },
+  { id: 'loss', step: '05', title: 'Financial engine', subtitle: 'Ground-up → gross → net', icon: BarChart3, x: 61, y: 41, type: 'model', detail: 'Calculate loss for every property and aggregate by scenario. Validate that losses increase monotonically with severity.', source: 'Deterministic model calculation' },
+  { id: 'intelligence', step: '06', title: 'Key insights', subtitle: 'Plain-language briefing', icon: Sparkles, x: 77, y: 17, type: 'ai', detail: 'The chatbot can explain selected uploaded sources and approved portfolio outputs through the backend.', source: 'Flask chat · Gemini or Claude' },
+  { id: 'review', step: '07', title: 'Underwriter review', subtitle: 'Decision required', icon: UserRound, x: 77, y: 66, type: 'human', detail: 'A catastrophe modeller reviews sources, assumptions, synthetic records and drainage limitations before approving the run.', source: 'Human-in-the-loop control' },
+  { id: 'publish', step: '08', title: 'Final results', subtitle: 'After approval', icon: CheckCircle2, x: 92, y: 41, type: 'output', detail: 'Release the approved loss table, EP curve and risk briefing. Unapproved runs remain drafts and cannot be exported.', source: 'Controlled model output' },
 ];
 
-const WORKFLOW_LINKS = [
-  ['hazard','quality'], ['hazard','vulnerability'], ['quality','exposure'], ['vulnerability','exposure'], ['exposure','loss'], ['loss','intelligence'], ['loss','review'], ['intelligence','review'], ['review','publish'],
-];
+// The pipeline plays stage by stage; the backend run happens in the background and stages from the
+// loss step on wait for it, so the animation never shows a result the model has not produced.
+const WORKFLOW_STAGE_DURATION = 1800;
+const WORKFLOW_FAST_DURATION = 120;
+const REVIEW_INDEX = WORKFLOW_NODES.findIndex((node) => node.id === 'review');
+const RESULT_GATE_INDEX = WORKFLOW_NODES.findIndex((node) => node.id === 'loss');
 
-const WORKFLOW_STAGE_DURATION = 5000;
-
-function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSignal = 0 }) {
+function WorkflowWorkspace({ onApproved, onRunStart, onRunChange = () => {}, autoRunSignal = 0, reloadSignal = 0 }) {
   const [selectedId, setSelectedId] = useState('hazard');
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [view, setView] = useState('story');
   const [running, setRunning] = useState(false);
   const [completed, setCompleted] = useState([]);
   const [current, setCurrent] = useState(null);
@@ -460,7 +486,11 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
   const [metrics, setMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState('');
-  const nodeRefs = useRef({});
+  const [anim, setAnim] = useState(null);
+  const [failed, setFailed] = useState(null);
+  const runPending = useRef(false);
+  const animIndex = useRef(0);
+  const story = useMemo(() => buildStory(metrics), [metrics]);
   const selectedNode = WORKFLOW_NODES.find((node) => node.id === selectedId);
   const selectedIndex = WORKFLOW_NODES.findIndex((node) => node.id === selectedId);
 
@@ -473,7 +503,7 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
       setRunId(run.id);
       setRunStatus(run.status);
       setRunSummary(run.configuration?.summary || null);
-      setCompleted((run.stages || []).filter((stage) => stage.status === 'completed').map((stage) => WORKFLOW_NODES[stage.position - 1]?.id).filter(Boolean));
+      setCompleted(run.status === 'approved' ? WORKFLOW_NODES.map((node) => node.id) : (run.stages || []).filter((stage) => stage.status === 'completed').map((stage) => WORKFLOW_NODES[stage.position - 1]?.id).filter(Boolean));
       setAwaitingApproval(run.status === 'review');
       setCurrent(run.status === 'review' ? 'review' : null);
       if (run.status === 'review') setSelectedId('review');
@@ -496,20 +526,27 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
   ];
   const addLog = (tone, text) => setLogs((items) => [...items, { time: new Date().toLocaleTimeString('en-GB', { hour12: false }), tone, text }]);
   const startRun = async () => {
-    if (running) return;
+    if (running || anim) return;
     onRunStart();
+    setView('pipeline'); setMetrics(null); setFailed(null);
     setCompleted([]); setAwaitingApproval(false); setRunning(true); setCurrent('hazard'); setRunSummary(null);
+    runPending.current = true;
+    setAnim({ index: 0, target: REVIEW_INDEX });
     setLogs([{ time: new Date().toLocaleTimeString('en-GB', { hour12: false }), tone: 'running', text: 'Calculating the uploaded portfolio in Flask…' }]);
     try {
       const run = await apiRequest('/model-runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ portfolioId: PORTFOLIO_ID }) });
       setRunId(run.id);
       setRunStatus(run.status);
       setRunSummary(run.configuration?.summary || null);
-      setCompleted(WORKFLOW_NODES.filter((node) => !['review', 'publish'].includes(node.id)).map((node) => node.id));
-      setCurrent('review'); setSelectedId('review'); setAwaitingApproval(true);
+      setAwaitingApproval(true);
+      runPending.current = false;
+      onRunChange();
+      setAnim((value) => value && { ...value });
       setLogs((items) => [...items, ...traceLines(run.trace), { time: clock(), tone: 'success', text: `${run.configuration?.summary?.propertyCount || 0} confirmed properties calculated in run ${run.id} (${run.trace?.totalMs ?? '?'} ms, trace ${run.trace?.traceId || 'n/a'}).` }, { time: clock(), tone: 'warning', text: 'Review the calculated summary before approval.' }]);
     } catch (error) {
-      setCurrent(null);
+      runPending.current = false;
+      setAnim(null);
+      setFailed({ id: WORKFLOW_NODES[animIndex.current]?.id, message: error.message });
       log.error('Workflow run failed', { step: error.step, requestId: error.requestId, message: error.message });
       setLogs((items) => [...items, ...failureLines(error, 'Model run')]);
     } finally { setRunning(false); }
@@ -520,10 +557,32 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
     startRun();
   }, [autoRunSignal]);
 
+  // Animation: light up one stage at a time, the side panel following it, until the target stage.
   useEffect(() => {
-    if (!current) return;
-    nodeRefs.current[current]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [current]);
+    if (!anim) return undefined;
+    const node = WORKFLOW_NODES[anim.index];
+    animIndex.current = anim.index;
+    if (anim.index >= anim.target) {
+      setAnim(null);
+      setCurrent(node?.id ?? null);
+      if (node) setSelectedId(node.id);
+      return undefined;
+    }
+    setCurrent(node.id); setSelectedId(node.id);
+    if (runPending.current && anim.index >= RESULT_GATE_INDEX) return undefined;
+    const timer = window.setTimeout(() => {
+      setCompleted((items) => [...new Set([...items, node.id])]);
+      setAnim((value) => value && { ...value, index: value.index + 1 });
+    }, anim.fast ? WORKFLOW_FAST_DURATION : WORKFLOW_STAGE_DURATION);
+    return () => window.clearTimeout(timer);
+  }, [anim]);
+
+  const replay = () => {
+    if (!runId || anim || running) return;
+    setFailed(null); setCompleted([]);
+    setAnim({ index: 0, target: runStatus === 'approved' ? WORKFLOW_NODES.length : REVIEW_INDEX });
+  };
+  const skip = () => setAnim((value) => value && { ...value, fast: true });
 
   const decide = async (action) => {
     if (!runId) return;
@@ -533,7 +592,8 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
       setLogs((items) => [...items, ...traceLines(decision.trace)]);
       setAwaitingApproval(false); setCurrent(null);
       setRunStatus(action === 'approve' ? 'approved' : 'revision_requested');
-      if (action === 'approve') { setCompleted(WORKFLOW_NODES.map((node) => node.id)); onApproved(); addLog('success', `Run ${runId} approved and property results saved.`); }
+      onRunChange();
+      if (action === 'approve') { setCompleted((items) => [...new Set([...items, 'review'])]); setAnim({ index: WORKFLOW_NODES.length - 1, target: WORKFLOW_NODES.length }); onApproved(); addLog('success', `Run ${runId} approved and property results saved.`); }
       else { addLog('warning', `Run ${runId} returned for revision.`); }
     } catch (error) {
       log.error(`Workflow ${action} failed`, { step: error.step, requestId: error.requestId, message: error.message });
@@ -543,7 +603,7 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
   };
 
   useEffect(() => {
-    if (!inspectorOpen || !runId) return undefined;
+    if (!runId) return undefined;
     if (metrics?.runId === runId && metrics?.status === runStatus) return undefined;
     let active = true;
     setMetricsLoading(true); setMetricsError('');
@@ -552,27 +612,16 @@ function WorkflowWorkspace({ onApproved, onRunStart, autoRunSignal = 0, reloadSi
       .catch((error) => { if (active) { setMetrics(null); setMetricsError(error.message); } })
       .finally(() => { if (active) setMetricsLoading(false); });
     return () => { active = false; };
-  }, [inspectorOpen, runId, runStatus]);
+  }, [runId, runStatus]);
 
-  const nodeState = (id) => completed.includes(id) ? 'complete' : current === id ? (id === 'review' ? 'review' : 'running') : 'waiting';
+  const openStage = (id) => { setSelectedId(id); setInspectorOpen(true); };
+  const nodeState = (id) => failed?.id === id ? 'failed' : completed.includes(id) ? 'complete' : current === id ? (id === 'review' ? 'review' : 'running') : 'waiting';
 
   return <section className="workflow-workspace">
-    <header className="workflow-toolbar"><div><Network size={17}/><span><strong>Agentic CAT workflow</strong><small>{runId || PORTFOLIO_ID} · Flask calculations</small></span></div><div className="workflow-actions"><span className={awaitingApproval ? 'review-status' : running ? 'run-status' : ''}><i/>{awaitingApproval ? 'HUMAN REVIEW' : running ? 'CALCULATING' : completed.includes('publish') ? 'APPROVED' : 'DRAFT'}</span><button className="run-workflow" disabled={running || awaitingApproval} onClick={startRun}><Play size={14}/> {running ? 'Calculating…' : 'Run workflow'}</button></div></header>
-    <div className={`workflow-layout ${inspectorOpen?'inspector-open':''}`}>
-      <div className="workflow-canvas">
-       <div className="workflow-surface">
-        <div className="workflow-grid"/>
-        <svg className="workflow-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {WORKFLOW_LINKS.map(([from,to]) => { const a=WORKFLOW_NODES.find(n=>n.id===from); const b=WORKFLOW_NODES.find(n=>n.id===to); const active=completed.includes(from)&&(completed.includes(to)||current===to); return <path key={`${from}-${to}`} className={active?'active':''} d={`M ${a.x} ${a.y} C ${(a.x+b.x)/2} ${a.y}, ${(a.x+b.x)/2} ${b.y}, ${b.x} ${b.y}`}/>; })}
-          {awaitingApproval && <path className="feedback" d="M 84 72 C 70 94, 28 94, 27 73"/>}
-        </svg>
-        {WORKFLOW_NODES.map((node) => { const Icon=node.icon; const state=nodeState(node.id); return <button ref={(element)=>{nodeRefs.current[node.id]=element}} key={node.id} className={`workflow-node ${node.type} ${state} ${selectedId===node.id?'selected':''}`} style={{left:`${node.x}%`,top:`${node.y}%`}} onClick={()=>{setSelectedId(node.id);setInspectorOpen(true)}}><span className="node-step">{node.step}</span><div className="node-icon"><Icon size={16}/></div><div><strong>{node.title}</strong><small>{node.subtitle}</small>{state==='running' && <span className="node-run-label">Processing stage · 5 sec</span>}</div><em>{state==='complete'?<Check size={11}/>:state==='running'?<span className="node-spinner"/>:state==='review'?<UserRound size={11}/>:<Clock3 size={11}/>}</em>{state==='running' && <span className="node-run-progress" aria-hidden="true"/>}</button>; })}
-        <div className="feedback-label"><UserRound size={12}/> Human feedback can return assumptions for revision</div>
-        {awaitingApproval && <div className="approval-card"><div><ShieldCheck size={18}/><span><strong>Human decision required</strong><small>{runSummary?.propertyCount} properties · KES {((runSummary?.totalTivKes || 0) / 1e9).toFixed(3)}B TIV · KES {((runSummary?.aalKes || 0) / 1e6).toFixed(2)}M AAL</small></span></div><div><button disabled={running} onClick={() => decide('return')}>Return for revision</button><button disabled={running} onClick={() => decide('approve')}><Check size={13}/> Approve run</button></div></div>}
-       </div>
-      </div>
-      {inspectorOpen && <StageDrawer node={selectedNode} nodes={WORKFLOW_NODES} onSelect={setSelectedId} onClose={()=>setInspectorOpen(false)} runId={runId} runStatus={runStatus} metrics={metrics} loading={metricsLoading} error={metricsError}/>}
-    </div>
+    <header className="workflow-toolbar"><div><Network size={17}/><span><strong>Portfolio flood review</strong><small>{runId || PORTFOLIO_ID}</small></span></div><div className="workflow-actions"><div className="workflow-view-switch" role="tablist" aria-label="Workflow view"><button role="tab" aria-selected={view==='story'} className={view==='story'?'active':''} onClick={()=>setView('story')}>Summary</button><button role="tab" aria-selected={view==='pipeline'} className={view==='pipeline'?'active':''} onClick={()=>setView('pipeline')}>Pipeline</button></div><span className={anim || running ? 'run-status' : awaitingApproval ? 'review-status' : ''}><i/>{anim || running ? 'CALCULATING' : awaitingApproval ? 'HUMAN REVIEW' : completed.includes('publish') ? 'APPROVED' : 'DRAFT'}</span>{view==='pipeline' && (anim ? <button className="ghost" onClick={skip}><FastForward size={14}/> Skip</button> : runId && <button className="ghost" disabled={running} onClick={replay}><RotateCcw size={14}/> Replay</button>)}<button className="run-workflow" disabled={running || awaitingApproval || !!anim} onClick={startRun}><Play size={14}/> {running ? 'Calculating…' : 'Calculate portfolio'}</button></div></header>
+    {view === 'story' && <div className="workflow-story"><RunStory metrics={metrics} loading={metricsLoading} error={metricsError} runId={runId} runStatus={runStatus} awaitingApproval={awaitingApproval} running={running} onDecide={decide} onOpenStage={openStage} onRun={startRun}/></div>}
+    {view === 'pipeline' && <div className="workflow-pipeline" style={{ '--step-ms': `${anim?.fast ? WORKFLOW_FAST_DURATION : WORKFLOW_STAGE_DURATION}ms` }}><Pipeline nodes={WORKFLOW_NODES} stateOf={nodeState} selectedId={selectedId} onSelect={setSelectedId} story={story} loading={metricsLoading || runPending.current} runId={runId} runStatus={runStatus} awaitingApproval={awaitingApproval && !anim} busy={running} onDecide={decide} onOpenDetails={openStage} error={failed?.message || metricsError}/></div>}
+    {inspectorOpen && <StageDrawer node={selectedNode} nodes={WORKFLOW_NODES} onSelect={setSelectedId} onClose={()=>setInspectorOpen(false)} runId={runId} runStatus={runStatus} metrics={metrics} loading={metricsLoading} error={metricsError}/>}
   </section>;
 }
 
@@ -619,8 +668,8 @@ function MapTooltip({ hover, tier, assets }) {
     type = 'PASTED PLACEMENT OFFER';
     const near = assets.filter((asset) => distanceKm(data, asset) <= 1);
     rows.push(['Annual flood chance', data.annualFloodProbability == null ? 'n/a' : `${(data.annualFloodProbability * 100).toFixed(1)}%`],
-      ['Average annual loss', kes(data.aalKes)], ['1-in-100 loss', kes(data.loss100Kes)],
-      ['Portfolio within 1 km', `${near.length} properties · ${kes(near.reduce((sum, asset) => sum + (asset.insuredValueKes || 0), 0))}`]);
+      ['Average annual loss', kes(data.aalKes)], ['1-in-100 loss', kes(data.loss100Kes)]);
+    if (data.portfolioComparison) rows.push(['Portfolio within 1 km', `${near.length} properties · ${kes(near.reduce((sum, asset) => sum + (asset.insuredValueKes || 0), 0))}`]);
     (data.flags || []).filter((flag) => flag.severity === 'high').slice(0, 3).forEach((flag, index) => rows.push([index ? '' : 'High findings', flag.title]));
   } else {
     type = 'FLOOD CLUSTER';
@@ -671,81 +720,85 @@ function buildFloodMesh(assets) {
   return { wet, edges, clusters };
 }
 
-// Animated rain over flooded buildings. Intensity follows the scenario's flood size (rarer = larger flood = heavier rain),
-// and drops are concentrated where buildings are wet, weighted by their proxy score.
+// Illustrative rain gets heavier with the selected severity tier. On a live map,
+// extra drops gather around wet assets; the fallback map still receives rain.
 function useRainLayer({ canvasRef, mapRef, ready, enabled, wet, intensity }) {
   useEffect(() => {
-    const maps = window.google?.maps;
     const canvas = canvasRef.current;
-    if (!ready || !enabled || !maps || !mapRef.current || !canvas) return undefined;
+    if (!enabled || !canvas) return undefined;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
     const context = canvas.getContext('2d');
-    const probe = new maps.OverlayView();
-    probe.onAdd = () => {}; probe.draw = () => {}; probe.onRemove = () => {};
-    probe.setMap(mapRef.current);
-    let cells = [], drops = [], splashes = [], frame = 0, width = 0, height = 0;
+    if (!context) return undefined;
+    const maps = ready ? window.google?.maps : null;
+    const map = ready ? mapRef.current : null;
+    const probe = maps && map ? new maps.OverlayView() : null;
+    if (probe) { probe.onAdd = () => {}; probe.draw = () => {}; probe.onRemove = () => {}; probe.setMap(map); }
+    let cells = [], cellWeight = 0, drops = [], splashes = [], frame = 0, width = 0, height = 0;
     const resize = () => {
-      const ratio = window.devicePixelRatio || 1;
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
       width = canvas.clientWidth; height = canvas.clientHeight;
       canvas.width = width * ratio; canvas.height = height * ratio;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
     };
     const project = () => {
-      const projection = probe.getProjection();
+      const projection = probe?.getProjection();
       if (!projection) return;
       cells = wet.map((asset) => {
         const point = projection.fromLatLngToContainerPixel(new maps.LatLng(asset.lat, asset.lng));
-        return point && { x: point.x, y: point.y, r: 18 + asset.score * 34, weight: .25 + asset.score };
+        return point && { x: point.x, y: point.y, r: 26 + asset.score * 46, weight: .25 + asset.score };
       }).filter((cell) => cell && cell.x > -60 && cell.y > -60 && cell.x < width + 60 && cell.y < height + 60);
+      cellWeight = 0;
+      cells.forEach((cell) => { cellWeight += cell.weight; cell.cumulativeWeight = cellWeight; });
     };
-    const totalWeight = () => cells.reduce((sum, cell) => sum + cell.weight, 0) || 1;
     const spawn = (local) => {
       let x, y;
       if (local && cells.length) {
-        let pick = Math.random() * totalWeight(), cell = cells[0];
-        for (const item of cells) { pick -= item.weight; if (pick <= 0) { cell = item; break; } }
+        const pick = Math.random() * cellWeight;
+        let low = 0, high = cells.length - 1;
+        while (low < high) { const mid = (low + high) >> 1; if (cells[mid].cumulativeWeight < pick) low = mid + 1; else high = mid; }
+        const cell = cells[low];
         const angle = Math.random() * Math.PI * 2, distance = Math.sqrt(Math.random()) * cell.r;
-        x = cell.x + Math.cos(angle) * distance; y = cell.y + Math.sin(angle) * distance - 40 - Math.random() * 30;
-        return { x, y, end: y + 40 + Math.random() * 30, speed: 7 + intensity * 7 + Math.random() * 3, length: 8 + intensity * 10, local: true };
+        x = cell.x + Math.cos(angle) * distance; y = cell.y + Math.sin(angle) * distance - 55 - Math.random() * 35;
+        return { x, y, end: y + 55 + Math.random() * 35, speed: 8 + intensity * 8 + Math.random() * 3, length: 10 + intensity * 17 + Math.random() * 5, local: true };
       }
-      x = Math.random() * width; y = -20 - Math.random() * height * .3;
-      return { x, y, end: height + 20, speed: 6 + intensity * 6, length: 6 + intensity * 8, local: false };
+      x = Math.random() * width; y = Math.random() * height - height * .2;
+      return { x, y, end: height + 20, speed: 7 + intensity * 8 + Math.random() * 2, length: 9 + intensity * 16 + Math.random() * 5, local: false };
     };
     const tick = () => {
       context.clearRect(0, 0, width, height);
-      const localTarget = Math.min(900, Math.round(totalWeight() * 6 * intensity));
-      const backgroundTarget = Math.round(width * height / 9000 * intensity);
+      const { local: localTarget, background: backgroundTarget } = rainTargets({ width, height, visibleWetCount: cells.length, intensity });
       const localCount = drops.filter((drop) => drop.local).length;
+      const backgroundCount = drops.length - localCount;
       for (let i = localCount; i < localTarget; i += 1) drops.push(spawn(true));
-      for (let i = drops.length - localCount; i < backgroundTarget; i += 1) drops.push(spawn(false));
+      for (let i = backgroundCount; i < backgroundTarget; i += 1) drops.push(spawn(false));
       context.lineCap = 'round';
       drops = drops.filter((drop) => {
-        drop.y += drop.speed; drop.x -= drop.speed * .18;
+        drop.y += drop.speed; drop.x -= drop.speed * .2;
         if (drop.y >= drop.end) { if (drop.local && splashes.length < 250) splashes.push({ x: drop.x, y: drop.end, r: 1, life: 1 }); return false; }
-        context.strokeStyle = drop.local ? `rgba(29, 92, 171, ${.35 + intensity * .4})` : `rgba(80, 120, 170, ${.12 + intensity * .15})`;
-        context.lineWidth = drop.local ? 1.4 : 1;
+        context.strokeStyle = drop.local ? `rgba(10, 76, 153, ${.45 + intensity * .45})` : `rgba(25, 92, 166, ${.18 + intensity * .34})`;
+        context.lineWidth = drop.local ? 1.2 + intensity * 1.6 : .9 + intensity * .8;
         context.beginPath(); context.moveTo(drop.x, drop.y); context.lineTo(drop.x + drop.length * .18, drop.y - drop.length); context.stroke();
         return true;
       });
       splashes = splashes.filter((splash) => {
         splash.r += .9; splash.life -= .06;
         if (splash.life <= 0) return false;
-        context.strokeStyle = `rgba(42, 120, 214, ${splash.life * .5})`; context.lineWidth = 1;
+        context.strokeStyle = `rgba(22, 100, 192, ${splash.life * .65})`; context.lineWidth = 1.2;
         context.beginPath(); context.ellipse(splash.x, splash.y, splash.r * 1.6, splash.r * .6, 0, 0, Math.PI * 2); context.stroke();
         return true;
       });
       frame = window.requestAnimationFrame(tick);
     };
     resize();
-    const listeners = [mapRef.current.addListener('bounds_changed', project), mapRef.current.addListener('idle', project)];
+    const listeners = map ? [map.addListener('bounds_changed', project), map.addListener('idle', project)] : [];
     const observer = new ResizeObserver(() => { resize(); project(); });
     observer.observe(canvas);
     const start = window.setTimeout(() => { project(); frame = window.requestAnimationFrame(tick); }, 60);
-    return () => { window.clearTimeout(start); window.cancelAnimationFrame(frame); listeners.forEach((listener) => listener.remove()); observer.disconnect(); probe.setMap(null); context.clearRect(0, 0, width, height); };
+    return () => { window.clearTimeout(start); window.cancelAnimationFrame(frame); listeners.forEach((listener) => listener.remove()); observer.disconnect(); probe?.setMap(null); context.clearRect(0, 0, width, height); };
   }, [canvasRef, mapRef, ready, enabled, wet, intensity]);
 }
 
-function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, properties, hotspots, offer, portfolioSummary }) {
+function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, properties, hotspots, offer, portfolioSummary, singleOffer = false }) {
   const node = useRef(null);
   const mapRef = useRef(null);
   const overlaysRef = useRef([]);
@@ -860,21 +913,21 @@ function MapWorkspace({ activeTier, setActiveTier, selected, setSelected, proper
       <canvas ref={rainRef} className="rain-canvas" aria-hidden="true"/>
       <MapTooltip hover={hover} tier={currentTier} assets={allAssets}/>
       {mapStatus !== 'ready' && <div className="map-fallback"><div className="map-grid"/>{allAssets.filter((asset) => asset.score > 0).slice(0, 60).map((asset) => <button key={asset.id} className="fallback-dot" style={{left:`${Math.max(2,Math.min(98,(asset.lng-36.6)/.5*100))}%`,top:`${Math.max(4,Math.min(96,(-1.1-asset.lat)/.4*100))}%`,'--pin':currentTier.color,'--s':asset.score}} title={asset.name} onClick={() => setSelected({ ...asset, kind: 'asset' })}/>)}<div className="map-setup"><Map size={22}/><strong>{mapStatus === 'missing' ? 'Add your Google Maps key for the live basemap' : mapStatus === 'error' ? 'Google Maps could not load' : 'Loading Nairobi map…'}</strong>{mapStatus === 'missing' && <span>VITE_GOOGLE_MAPS_API_KEY</span>}</div></div>}
-      <div className="model-run"><span><i/> {portfolioSummary?.status === 'approved' ? 'APPROVED' : 'DRAFT'}: {PORTFOLIO_ID}</span><small>{portfolioSummary ? `KES ${(portfolioSummary.totalInsuredValueKes / 1e9).toFixed(3)}B TIV · ${portfolioSummary.propertyCount} properties` : 'Loading portfolio…'}</small></div>
+      <div className="model-run">{singleOffer ? <><span><i/> SINGLE OFFER LOCATION</span><small>Portfolio properties are hidden; see offer checks for site risk.</small></> : <><span><i/> {portfolioSummary?.status === 'approved' ? 'APPROVED' : 'DRAFT'}: {PORTFOLIO_ID}</span><small>{portfolioSummary ? `KES ${(portfolioSummary.totalInsuredValueKes / 1e9).toFixed(3)}B TIV · ${portfolioSummary.propertyCount} properties` : 'Loading portfolio…'}</small></>}</div>
       <div className="tier-control"><div><span>HAZARD SUSCEPTIBILITY TIER</span><small>Proxy score · not flood depth</small></div><div className="tier-buttons">{TIERS.map((tier) => <button key={tier.id} className={activeTier === tier.id ? 'active' : ''} style={{'--tier':tier.color}} onClick={() => setActiveTier(tier.id)}><i />{tier.label}<span>{tier.range}</span></button>)}</div></div>
       <div className="map-legend tier-legend">
         <span>{currentTier.label.toUpperCase()} SCENARIO · {currentTier.range}</span>
-        <div className="legend-row"><i className="dot" style={{background: currentTier.color}}/><b>{tierStats.wet}</b> of {tierStats.total} properties wet · KES {(tierStats.wetValue / 1000).toFixed(2)}B</div>
-        <div className="legend-row"><i className="dot dry"/>Dry in this scenario</div>
-        <div className="legend-row"><i className="ramp" style={{background:`linear-gradient(90deg, ${currentTier.color}55, ${currentTier.color})`}}/>Size and colour = proxy score 0 → 1</div>
-        {layers.mesh && <><div className="legend-row"><i className="line" style={{borderColor: currentTier.color}}/>{tierStats.links} connectors: wet neighbours within {LINK_KM} km</div><div className="legend-row"><i className="hull" style={{borderColor: currentTier.color, background: `${currentTier.color}22`}}/>{tierStats.clusters} flood clusters (4+ connected)</div></>}
-        {layers.pulse && <div className="legend-row"><i className="pulse-key" style={{'--pulse': currentTier.color}}/>Pulsing: {Math.min(PULSE_COUNT, tierStats.wet)} highest scores</div>}
-        {layers.rain && <div className="legend-row"><i className="rain-key"/>Rain over wet buildings · {Math.round(currentTier.rain * 100)}% intensity (rarer, larger floods rain harder)</div>}
+        {singleOffer ? <div className="legend-row"><i className="dot" style={{background: '#d11242'}}/>Placement offer is marked on the map; portfolio overlay is hidden.</div> : <div className="legend-row"><i className="dot" style={{background: currentTier.color}}/><b>{tierStats.wet}</b> of {tierStats.total} properties wet · KES {(tierStats.wetValue / 1000).toFixed(2)}B</div>}
+        {!singleOffer && <><div className="legend-row"><i className="dot dry"/>Dry in this scenario</div>
+          <div className="legend-row"><i className="ramp" style={{background:`linear-gradient(90deg, ${currentTier.color}55, ${currentTier.color})`}}/>Size and colour = proxy score 0 → 1</div>
+          {layers.mesh && <><div className="legend-row"><i className="line" style={{borderColor: currentTier.color}}/>{tierStats.links} connectors: wet neighbours within {LINK_KM} km</div><div className="legend-row"><i className="hull" style={{borderColor: currentTier.color, background: `${currentTier.color}22`}}/>{tierStats.clusters} flood clusters (4+ connected)</div></>}
+          {layers.pulse && <div className="legend-row"><i className="pulse-key" style={{'--pulse': currentTier.color}}/>Pulsing: {Math.min(PULSE_COUNT, tierStats.wet)} highest scores</div>}
+          {layers.rain && <div className="legend-row"><i className="rain-key"/>{currentTier.rainLabel} rain animation · illustrative, not a forecast</div>}</>}
       </div>
-      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['assets','Portfolio properties'],['rain','Rain over flooded areas'],['mesh','Flood clusters & connectors'],['pulse','Pulse highest scores'],['hotspots','Documented hotspots']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Scenario: {currentTier.label} ({currentTier.range})</small></div>}
+      {layerMenu && <div className="layer-menu"><strong>MAP LAYERS</strong>{[['assets','Portfolio properties'],['rain','Animated rain (illustrative)'],['mesh','Flood clusters & connectors'],['pulse','Pulse highest scores'],['hotspots','Documented hotspots']].map(([key,label]) => <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => setLayers({...layers,[key]:!layers[key]})}/><span>{label}</span></label>)}<small>Scenario: {currentTier.label} ({currentTier.range})</small></div>}
       {selected && <div className="asset-inspector"><button className="close" onClick={() => setSelected(null)}><X size={15}/></button><span className="inspector-type">{selected.kind === 'hotspot' ? 'REFERENCE HOTSPOT' : selected.kind === 'cluster' ? 'FLOOD CLUSTER' : 'PORTFOLIO PROPERTY'}</span><h3>{selected.name}</h3><p><MapPin size={12}/> {selected.lat.toFixed(4)}, {selected.lng.toFixed(4)}</p><div className="inspector-grid">{selected.kind === 'cluster' ? <><div><span>PROPERTIES</span><strong>{selected.count}</strong></div><div><span>MEAN {currentTier.label.toUpperCase()} SCORE</span><strong style={{color:currentTier.color}}>{selected.meanScore.toFixed(2)}</strong></div><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>SCENARIO</span><strong>{currentTier.range}</strong></div></> : <><div><span>{currentTier.label.toUpperCase()} SCORE</span><strong style={{color: (selected.hazardScores?.[activeTier] ?? 0) > 0 ? currentTier.color : undefined}}>{selected.hazardScores?.[activeTier] == null ? 'n/a' : Number(selected.hazardScores[activeTier]).toFixed(2)}</strong></div><div><span>SCENARIO</span><strong style={{color:currentTier.color}}>{currentTier.label} · {currentTier.range}</strong></div>{selected.value != null && <><div><span>INSURED VALUE</span><strong>KES {selected.value.toFixed(1)}M</strong></div><div><span>APPROVED 1-IN-100 LOSS</span><strong className="danger">{selected.loss == null ? 'Pending run' : `KES ${selected.loss.toFixed(2)}M`}</strong></div></>}</>}</div><div className="inspector-caveat"><AlertTriangle size={13}/>{selected.status || 'Portfolio source'}</div>{selected.kind !== 'cluster' && <button className="ask-location" onClick={() => setSelected({...selected, ask:true})}><Bot size={15}/> Ask Furika Bot about this location <MessageSquareText size={13}/></button>}</div>}
     </div>
-    <footer className="coordinates">{currentTier.label} scenario <i/> {tierStats.wet} wet properties <i/> {tierStats.clusters} clusters <i/> {tierStats.links} connectors <span>GOOGLE MAPS · PROXY OVERLAY</span></footer>
+    <footer className="coordinates">{singleOffer ? 'Single offer · portfolio overlay hidden' : <>{currentTier.label} scenario <i/> {tierStats.wet} wet properties <i/> {tierStats.clusters} clusters <i/> {tierStats.links} connectors</>} <span>GOOGLE MAPS · PROXY OVERLAY</span></footer>
   </section>;
 }
 
@@ -944,21 +997,35 @@ function DataSourcesScreen({ dataSources, onUploadFiles, onDeleteSource, onRepro
 }
 
 function Workspace({ onLogout }) {
+  const [savedView] = useState(() => readStorage('furika-workspace-view', {}));
+  const [savedOfferReview] = useState(() => {
+    const chat = restoreChatState(localStorage, INITIAL_CHAT_MESSAGE);
+    return chat.offerContext ? [...chat.messages].reverse().find((message) => message.offerChecks) || null : null;
+  });
   const [activeScreen, setActiveScreen] = useState('workspace');
   const [tier, setTier] = useState('severe');
   const [selected, setSelected] = useState(null);
   const [chatContext, setChatContext] = useState(null);
   const [assets, setAssets] = useState([]);
   const [chatOpen, setChatOpen] = useState(true);
-  const [rightView, setRightView] = useState('workflow');
+  const [rightView, setRightView] = useState(savedView.rightView === 'map' ? 'map' : 'workflow');
   const [reportReady, setReportReady] = useState(false);
   const [navExpanded, setNavExpanded] = useState(false);
-  const [rightOpen, setRightOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(Boolean(savedView.rightOpen));
   const [workflowRunSignal, setWorkflowRunSignal] = useState(0);
   const [workflowReloadSignal, setWorkflowReloadSignal] = useState(0);
-  const [offerSite, setOfferSite] = useState(null);
-  const showOffer = (site) => { setOfferSite(site); setRightView('map'); setRightOpen(true); };
-  const showPendingRun = () => { setRightView('workflow'); setRightOpen(true); setWorkflowReloadSignal((signal) => signal + 1); };
+  const [offerSite, setOfferSite] = useState(savedOfferReview?.asset || null);
+  const [offerReview, setOfferReview] = useState(savedOfferReview);
+  const [workflowScope, setWorkflowScope] = useState(savedView.workflowScope === 'offer' && savedOfferReview ? 'offer' : 'portfolio');
+  useEffect(() => { writeStorage('furika-workspace-view', { rightOpen, rightView, workflowScope }); }, [rightOpen, rightView, workflowScope]);
+  const showOfferReview = (response, { restoring = false } = {}) => {
+    setOfferReview(response?.offerChecks ? response : null);
+    setOfferSite(response?.asset || null);
+    setSelected(null);
+    if (!restoring || !response?.offerChecks) setWorkflowScope(response?.offerChecks ? 'offer' : 'portfolio');
+    if (response?.offerChecks && !restoring) setRightView('workflow');
+  };
+  const showPendingRun = (_run, { restoring = false } = {}) => { setWorkflowScope('portfolio'); if (!restoring) setRightView('workflow'); setWorkflowReloadSignal((signal) => signal + 1); };
   const [uploads, setUploads] = useState([]);
   const [sourcesLoad, setSourcesLoad] = useState({ status: 'loading', message: '' });
   const [attested, setAttestedState] = useState(() => { const stored = readStorage(ATTESTATION_STORAGE_KEY, ''); return ['synthetic', 'redacted'].includes(stored) ? stored : ''; });
@@ -966,6 +1033,7 @@ function Workspace({ onLogout }) {
   const [mapProperties, setMapProperties] = useState([]);
   const [mapHotspots, setMapHotspots] = useState([]);
   const [portfolioSummary, setPortfolioSummary] = useState(null);
+  const [latestRun, setLatestRun] = useState(null);
   const dataSources = useMemo(() => uploads.map(toSource), [uploads]);
   const setAttested = (value) => { setAttestedState(value); writeStorage(ATTESTATION_STORAGE_KEY, value); };
   const refreshSources = async () => {
@@ -980,11 +1048,13 @@ function Workspace({ onLogout }) {
   useEffect(() => { refreshSources(); }, []);
   const refreshMap = async () => {
     try {
-      const [properties, hotspots, summary] = await Promise.all([
+      const [properties, hotspots, summary, runs] = await Promise.all([
         apiGet(`/portfolios/${PORTFOLIO_ID}/properties?limit=2000`),
         apiGet('/locations/hotspots'),
         apiGet(`/portfolios/${PORTFOLIO_ID}/summary`),
+        apiGet(`/model-runs?portfolioId=${encodeURIComponent(PORTFOLIO_ID)}`).catch(() => ({ items: [] })),
       ]);
+      setLatestRun(runs.items?.[0] || null);
       setMapProperties(properties.items || []);
       setMapHotspots(hotspots.items || []);
       setPortfolioSummary(summary);
@@ -1046,10 +1116,20 @@ function Workspace({ onLogout }) {
     setChatOpen(true);
     setRightOpen(false);
   };
+  const askAboutPortfolio = () => {
+    setChatContext(null);
+    setActiveScreen('workspace');
+    setChatOpen(true);
+    setRightOpen(false);
+  };
   return <main className={`workspace ${chatOpen ? '' : 'chat-collapsed'} ${navExpanded ? 'nav-expanded' : ''}`}>
     <header className="app-header minimal"><Brand /><div className="header-actions"><button className="profile-button"><span className="header-avatar">AO</span><span>Dr. A. Omondi</span></button><button onClick={onLogout} title="Sign out"><LogOut size={16}/></button></div></header>
-    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data store</strong></button><button className={`rail-bot ${activeScreen==='workspace'?'active':''}`} onClick={()=>setActiveScreen('workspace')}><FurikaMascot size={26}/><strong>Furika Bot</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button><button className={activeScreen==='accumulation'?'active':''} onClick={()=>setActiveScreen('accumulation')}><Layers3 size={19}/><strong>Accumulation</strong></button></div></nav>
-      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty}/> : activeScreen==='accumulation' ? <AccumulationScreen dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource} onReprocessSource={reprocessDataSource} attested={attested} setAttested={setAttested} loadState={sourcesLoad} uploadErrors={uploadErrors} onDismissErrors={() => setUploadErrors([])}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>{chatOpen && <ChatPanel selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false)=>{setRightView(view);setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} onWorkflowPending={showPendingRun} onOfferLocation={showOffer} reportReady={reportReady} portfolioSummary={portfolioSummary} dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/>} {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}{rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> Workflow <span>HITL</span></button><div><i className={reportReady?'approved-dot':''}/> {reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} properties={mapProperties} hotspots={mapHotspots} offer={offerSite} portfolioSummary={portfolioSummary}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}><WorkflowWorkspace autoRunSignal={workflowRunSignal} reloadSignal={workflowReloadSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>{setReportReady(true);refreshMap()}}/></div></div></div>}</div>}
+    <div className="app-body"><nav className={`tool-rail ${navExpanded?'expanded':''}`}><button className="rail-toggle" onClick={()=>setNavExpanded(!navExpanded)} title={navExpanded?'Collapse navigation':'Expand navigation'}><Menu size={19}/><strong>{navExpanded?'Collapse':'Menu'}</strong></button><div className="rail-items"><button className={activeScreen==='data-sources'?'active':''} onClick={()=>setActiveScreen('data-sources')}><Database size={19}/><strong>Data store</strong></button><button className={`rail-bot ${activeScreen==='workspace'?'active':''}`} onClick={()=>setActiveScreen('workspace')}><FurikaMascot size={26}/><strong>Furika Bot</strong></button><button className={activeScreen==='portfolio'?'active':''} onClick={()=>setActiveScreen('portfolio')}><Building2 size={19}/><strong>Portfolio</strong></button></div></nav>
+      {activeScreen==='portfolio' ? <PortfolioScreen onAskProperty={askAboutProperty} onAskPortfolio={askAboutPortfolio} onReviewRun={() => { setActiveScreen('workspace'); setWorkflowScope('portfolio'); setRightView('workflow'); setRightOpen(true); setWorkflowReloadSignal((signal) => signal + 1); }} onUploadFiles={uploadDataSources} dataSources={dataSources} attested={attested} setAttested={setAttested}/> : activeScreen==='data-sources' ? <DataSourcesScreen dataSources={dataSources} onUploadFiles={uploadDataSources} onDeleteSource={deleteDataSource} onReprocessSource={reprocessDataSource} attested={attested} setAttested={setAttested} loadState={sourcesLoad} uploadErrors={uploadErrors} onDismissErrors={() => setUploadErrors([])}/> : <div className={`split-view ${rightOpen?'':'right-collapsed'}`}>
+        {chatOpen && <ChatPanel onRunDecided={() => { refreshMap(); setWorkflowReloadSignal((signal) => signal + 1); }} latestRun={latestRun} selectedLocation={chatContext} addedAssets={assets} onAddAsset={(asset) => setAssets([...assets, asset])} onOpenView={(view,autoRun=false,review=null)=>{if(view==='offer-workflow'){if(review?.offerChecks)showOfferReview(review);setWorkflowScope('offer');setRightView('workflow');}else{if(view==='workflow')setWorkflowScope('portfolio');setRightView(view);}setRightOpen(true);if(view==='workflow'&&autoRun)setWorkflowRunSignal((signal)=>signal+1)}} onWorkflowPending={showPendingRun} onOfferReview={showOfferReview} reportReady={reportReady} portfolioSummary={portfolioSummary} dataSources={dataSources} onUploadFiles={uploadDataSources} attested={attested} setAttested={setAttested}/>}
+        {rightOpen && <button className="collapse-chat" onClick={() => setChatOpen(!chatOpen)} title={chatOpen ? 'Collapse analyst' : 'Open analyst'}>{chatOpen ? <PanelLeftClose size={16}/> : <PanelLeftOpen size={16}/>}</button>}
+        {rightOpen && <div className="right-pane"><div className="right-view-tabs"><button className={rightView==='map'?'active':''} onClick={()=>setRightView('map')}><Map size={15}/> Map</button><button className={rightView==='workflow'?'active':''} onClick={()=>setRightView('workflow')}><Workflow size={15}/> {workflowScope==='offer' && offerReview ? 'Offer workflow' : 'Workflow'} <span>HITL</span></button><div><i className={workflowScope==='offer' && offerReview ? '' : reportReady?'approved-dot':''}/> {workflowScope==='offer' && offerReview ? 'REVIEW' : reportReady?'APPROVED':'DRAFT'}</div><button className="collapse-right" onClick={()=>{if(!chatOpen)setChatOpen(true);setRightOpen(false)}} title="Cancel and close side panel"><X size={16}/></button></div><div className="right-view-content"><div className={`right-mode ${rightView==='map'?'active':''}`}><MapWorkspace activeTier={tier} setActiveTier={setTier} selected={selected} setSelected={setSelected} properties={workflowScope==='offer' && offerReview && !offerSite?.portfolioComparison ? [] : mapProperties} hotspots={mapHotspots} offer={offerSite} portfolioSummary={portfolioSummary} singleOffer={workflowScope==='offer' && !!offerReview && !offerSite?.portfolioComparison}/></div><div className={`right-mode ${rightView==='workflow'?'active':''}`}>{workflowScope==='offer' && offerReview ? <OfferWorkflowWorkspace review={offerReview} onViewPortfolio={()=>setWorkflowScope('portfolio')}/> : <WorkflowWorkspace onRunChange={refreshMap} autoRunSignal={workflowRunSignal} reloadSignal={workflowReloadSignal} onRunStart={()=>setReportReady(false)} onApproved={()=>{setReportReady(true);refreshMap()}}/>}</div></div></div>}
+      </div>}
     </div>
   </main>;
 }

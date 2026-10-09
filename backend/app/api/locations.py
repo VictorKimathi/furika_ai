@@ -1,7 +1,7 @@
 from flask_restx import Namespace, Resource, reqparse
 
 from ..services import geocoding
-from ..models import Hotspot
+from ..models import HazardReferencePoint, Hotspot
 from .swagger_models import error_model, geocode_response
 
 
@@ -15,6 +15,24 @@ class HotspotsResource(Resource):
         items = Hotspot.query.order_by(Hotspot.name).all()
         return {"items": [{"id": item.id, "name": item.name, "latitude": item.latitude,
                            "longitude": item.longitude, "severity": item.severity} for item in items], "total": len(items)}
+
+
+@ns.route("/flood-reference")
+class FloodReferenceResource(Resource):
+    def get(self):
+        """Fixed Nairobi susceptibility reference for Accumulation, separate from uploaded insured assets."""
+        points = HazardReferencePoint.query.order_by(HazardReferencePoint.id).all()
+        hotspots = Hotspot.query.order_by(Hotspot.name).all()
+        return {
+            "points": [{"id": point.id, "latitude": point.latitude, "longitude": point.longitude,
+                        "hazardScores": point.scores} for point in points],
+            "hotspots": [{"id": spot.id, "name": spot.name, "latitude": spot.latitude,
+                          "longitude": spot.longitude, "severity": spot.severity} for spot in hotspots],
+            "referenceUploadIds": sorted({point.source_upload_id for point in points if point.source_upload_id}),
+            "pointCount": len(points),
+            "hotspotCount": len(hotspots),
+            "method": "Five 0–1 susceptibility proxy scores at reference locations; not flood extents or measured probabilities.",
+        }
 
 geocode_parser = reqparse.RequestParser()
 geocode_parser.add_argument("q", type=str, required=True, location="args", help="Address, neighbourhood, or place in Nairobi")

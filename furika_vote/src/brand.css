@@ -80,9 +80,10 @@
 
 /* Rain over flooded areas */
 .map-canvas .rain-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
-.map-canvas .rain-sky{position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(4,29,59,calc(var(--rain) * .28)) 0%,rgba(4,29,59,calc(var(--rain) * .08)) 55%,transparent 100%);transition:background .6s ease}
+.map-canvas .rain-sky{position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(4,29,59,calc(var(--rain) * .38)) 0%,rgba(4,29,59,calc(var(--rain) * .12)) 55%,transparent 100%);transition:background .6s ease}
 .map-canvas>.tier-control,.map-canvas>.map-legend,.map-canvas>.model-run,.map-canvas>.layer-menu,.map-canvas>.asset-inspector{z-index:6}
-.tier-legend i.rain-key{width:12px;height:12px;background:repeating-linear-gradient(110deg,transparent 0 3px,#1d5cab 3px 4px)}
+.tier-legend i.rain-key{width:14px;height:14px;background:repeating-linear-gradient(110deg,transparent 0 3px,#1554a0 3px 5px)}
+.map-fallback .fallback-dot,.map-fallback .map-setup{z-index:4}
 @media(prefers-reduced-motion:reduce){.map-canvas .rain-canvas{display:none}}
 
 /* Map hover tooltip: exact location + property facts */

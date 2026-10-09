@@ -1,7 +1,8 @@
+import pytest
 from app.services import run_metrics
 
 BASE = "/api/v1"
-EXPECTED = {"ingestion": 13, "hazard": 10, "vulnerability": 8, "exposure": 10, "financial": 17, "ai": 14, "portfolio": 7, "trust": 8}
+EXPECTED = {"ingestion": 13, "hazard": 10, "vulnerability": 8, "exposure": 10, "financial": 21, "ai": 14, "portfolio": 7, "trust": 8}
 
 
 def test_every_catalogue_metric_is_returned(seeded):
@@ -16,6 +17,12 @@ def test_every_catalogue_metric_is_returned(seeded):
     financial = {item["id"]: item for item in body["stages"]["financial"]["metrics"]}
     assert financial["FIN-17"]["status"] == "pass"
     assert financial["FIN-04"]["chart"]["logX"] is True
+    # Ground-up -> gross -> net is reported per tier and only ever shrinks.
+    for tier in financial["FIN-18"]["data"]["tiers"]:
+        assert tier["netKes"] <= tier["grossKes"] <= tier["groundUpKes"] + 1e-6
+        assert abs(tier["grossKes"] + tier["ownerKeepsKes"] + tier["aboveLimitKes"] - tier["groundUpKes"]) < 1
+    example = financial["FIN-19"]["data"]
+    assert example and all(step["groundUpKes"] == pytest.approx(step["damageRatio"] * example["tivKes"], rel=1e-4) for step in example["steps"])
     ep = financial["FIN-04"]["chart"]["series"][0]["values"]
     assert ep == sorted(ep)  # the EP curve rises with return period
 

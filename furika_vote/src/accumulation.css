@@ -1,4 +1,7 @@
 .acc-screen{flex:1;min-width:0;height:100%;overflow:auto;padding:24px 28px 36px;background:#f2f5f8;color:#18324b;font-family:var(--font,Inter,Arial,sans-serif)}
+.acc-screen-embedded{height:auto;overflow:visible;padding:24px 0 12px;background:transparent}
+.acc-screen-embedded .acc-header{margin-bottom:14px}
+.acc-screen-embedded .acc-header h2{margin:4px 0 5px;font-size:22px;line-height:1.1;color:#0a2846}
 .acc-screen *{box-sizing:border-box}
 .acc-header{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:20px}
 .acc-header>div:first-child>span{font-size:11px;font-weight:800;letter-spacing:.14em;color:#54728c}
@@ -69,7 +72,7 @@
 .acc-map-legend{position:absolute;bottom:10px;left:10px;right:10px;display:flex;flex-wrap:wrap;gap:5px 11px;width:max-content;max-width:calc(100% - 20px);padding:7px 10px;border-radius:5px;background:#fff;box-shadow:0 1px 7px #16304726;color:#486178;font-size:10px}
 .acc-map-legend span{display:flex;align-items:center;gap:5px}
 .acc-map-legend i{width:10px;height:10px;border-radius:50%;display:block}
-.acc-map-legend i.region{background:#12395f}.acc-map-legend i.asset{background:#10b981}
+.acc-map-legend i.region{background:#12395f}.acc-map-legend i.asset{background:#10b981}.acc-map-legend i.hotspot{background:#102e50;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}
 .acc-map-legend i.low{background:#36a7aa}.acc-map-legend i.moderate{background:#e9ad3a}.acc-map-legend i.high{background:#ed7438}.acc-map-legend i.severe{background:#c7353d}
 .acc-map-note{margin:0;padding:8px 12px;border-top:1px solid #e7edf2;color:#61778c;font-size:11px}
 .acc-region-list{max-height:380px;overflow:auto}
@@ -87,7 +90,7 @@
 .acc-insight-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0}
 .acc-insight-grid>div{min-width:0;padding:16px;border-right:1px solid #edf1f4;border-bottom:1px solid #edf1f4}
 .acc-insight-grid strong{display:block;margin-top:8px;color:#193a58;font-size:16px;overflow:hidden;text-overflow:ellipsis}
-.acc-property-list{padding:14px 16px}
+.acc-property-list{max-height:360px;overflow:auto;padding:14px 16px}
 .acc-property-list>strong{display:block;margin-bottom:7px;font-size:13px;color:#25435e}
 .acc-property-list>button{width:100%;min-height:45px;padding:7px 2px;display:flex;align-items:center;justify-content:space-between;gap:15px;border:0;border-top:1px solid #ecf0f3;background:#fff;text-align:left;cursor:pointer}
 .acc-property-list>button:hover{color:#176da3}
@@ -97,5 +100,8 @@
 .acc-selected-property{position:relative;margin:0 16px 16px;padding:11px 14px;display:grid;gap:4px;border:1px solid #bfdfd4;border-radius:6px;background:#f2faf7}
 .acc-selected-property span{font-size:10px;font-weight:800;letter-spacing:.08em;color:#459071}.acc-selected-property strong{font-size:14px;color:#174332}.acc-selected-property small{font-size:11px;color:#567c6b}
 .acc-selected-property button{position:absolute;right:9px;top:9px;border:0;background:transparent;color:#3b7c66;font-size:11px;cursor:pointer}
+.acc-selected-property.reference{border-color:#bbd1e2;background:#f0f6fa}
+.acc-selected-property.reference span,.acc-selected-property.reference strong{color:#173c5b}
+.acc-selected-property .acc-approx-warning{color:#a64b31;font-weight:700}
 @media(max-width:1180px){.acc-upload{align-items:flex-start;flex-direction:column}.acc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.acc-insight-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:780px){.acc-screen{padding:16px 12px 76px}.acc-header{align-items:stretch;flex-direction:column;gap:14px}.acc-source-select select{max-width:none;width:100%}.acc-upload-actions{width:100%;justify-content:space-between;flex-wrap:wrap}.acc-layout{grid-template-columns:1fr}.acc-kpis{gap:8px}.acc-kpis article{min-height:100px;padding:12px}.acc-kpis strong{font-size:20px}.acc-insight-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.acc-map-wrap{height:330px}.acc-overview{flex-direction:column;gap:8px}.acc-flood-heading{flex-direction:column;gap:2px}.acc-flood-timeline button{min-width:68px}.acc-flood-timeline .acc-flood-play{min-width:70px}}

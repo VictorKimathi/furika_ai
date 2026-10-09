@@ -15,7 +15,7 @@ import numpy as np
 from sqlalchemy import false, func, or_
 
 from ..extensions import db
-from ..models import DocumentChunk, FieldProvenance, HazardResult, Hotspot, LossResult, ModelRun, Portfolio, Property, Upload, UploadRow, ValidationIssue, new_id
+from ..models import DocumentChunk, FieldProvenance, HazardReferencePoint, HazardResult, Hotspot, LossResult, ModelRun, Portfolio, Property, Upload, UploadRow, ValidationIssue, new_id
 from . import furika_model as fm
 from .ingestion.enrichment import evaluate_row
 from .ingestion.pipeline import apply_row_data, row_context
@@ -192,10 +192,18 @@ def _parse_bbox(value: str):
     return min_lng, min_lat, max_lng, max_lat
 
 
+def _exclude_reference_properties(query):
+    """Keep the seeded hazard locations out of Accumulation's underwriter exposure."""
+    reference_uploads = db.session.query(HazardReferencePoint.source_upload_id).filter(HazardReferencePoint.source_upload_id.isnot(None))
+    return query.filter(or_(Property.upload_id.is_(None), Property.upload_id.notin_(reference_uploads)))
+
+
 def list_properties(portfolio_id: str, filters: dict) -> dict | None:
     if db.session.get(Portfolio, portfolio_id) is None:
         return None
     query = Property.query.filter(Property.portfolio_id == portfolio_id)
+    if str(filters.get("excludeReference") or "").lower() == "true":
+        query = _exclude_reference_properties(query)
     upload_id = filters.get("uploadId")
     if upload_id:
         if Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first() is None:
@@ -381,12 +389,14 @@ def property_detail(property_id: str, include_draft: bool = False) -> dict | Non
     }
 
 
-def list_clusters(portfolio_id: str, cluster_type: str, upload_id: str | None = None) -> dict | None:
+def list_clusters(portfolio_id: str, cluster_type: str, upload_id: str | None = None, exclude_reference: bool = False) -> dict | None:
     if db.session.get(Portfolio, portfolio_id) is None:
         return None
     if cluster_type not in CLUSTER_TYPES:
         raise RepositoryError(f"type must be one of {', '.join(CLUSTER_TYPES)}.")
     query = Property.query.filter_by(portfolio_id=portfolio_id)
+    if exclude_reference:
+        query = _exclude_reference_properties(query)
     if upload_id:
         if Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first() is None:
             raise RepositoryError("The selected upload was not found in this portfolio.", 404)

@@ -1,3 +1,6 @@
+import io
+
+
 SAMPLE_EXPOSURE = [
     {
         "loc_id": "NBO-TEST-001",
@@ -52,6 +55,31 @@ def test_accumulation_regions_can_be_filtered_by_uploaded_dataset(seeded):
     assert sum(item["propertyCount"] for item in clusters.json["items"]) == properties.json["total"]
     assert all(item["geocodedCount"] <= item["propertyCount"] for item in clusters.json["items"])
     assert all(item["centroidLat"] is not None for item in clusters.json["items"] if item["geocodedCount"])
+
+
+def test_accumulation_reference_stays_separate_from_new_insured_assets(seeded):
+    base = "/api/v1/portfolios/SYN-PORT-142"
+    reference = seeded.get("/api/v1/locations/flood-reference")
+    assert reference.status_code == 200
+    assert reference.json["pointCount"] == 6
+    assert reference.json["referenceUploadIds"]
+    assert seeded.get(f"{base}/properties?excludeReference=true").json["total"] == 0
+
+    content = ("loc_id,name,region,lat,lon,housing_class,floor_area_m2,cost_per_m2_kes,tiv_kes,synthetic\n"
+               "UW-001,Underwriter shop,Mathare,-1.2584,36.8554,semi_permanent,50,10000,500000,TRUE\n"
+               "UW-002,Underwriter store,Mathare,-1.2568,36.8581,semi_permanent,70,10000,700000,TRUE\n")
+    uploaded = seeded.post(f"{base}/uploads", data={"file": (io.BytesIO(content.encode()), "underwriter-assets.csv"),
+                                                    "attestation": "synthetic"}, content_type="multipart/form-data")
+    assert uploaded.status_code == 201, uploaded.json
+    assert uploaded.json["status"] == "done"
+    assets = seeded.get(f"{base}/properties?excludeReference=true&limit=2000").json
+    regions = seeded.get(f"{base}/clusters?type=neighbourhood&excludeReference=true").json
+    assert assets["total"] == 2
+    assert {item["id"] for item in assets["items"]} == {"UW-001", "UW-002"}
+    assert all(item["hazardSource"] == "interpolated" for item in assets["items"])
+    assert sum(item["propertyCount"] for item in regions["items"]) == 2
+    assert seeded.get(f"{base}/properties").json["total"] == 8
+    assert seeded.get("/api/v1/locations/flood-reference").json["pointCount"] == 6
 
 
 def test_accumulation_rejects_upload_outside_portfolio(seeded):

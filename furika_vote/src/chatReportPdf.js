@@ -58,6 +58,71 @@ function citationLabel(citation) {
   return name;
 }
 
+export function relevantOfferStages(stages = []) {
+  return stages.filter((stage) => ['warning', 'blocked', 'review'].includes(stage.status));
+}
+
+const reportSection = (blocks, title) => {
+  const start = blocks.findIndex((block) => block.type === 'heading' && block.text.trim().toLowerCase() === title);
+  if (start < 0) return [];
+  const end = blocks.findIndex((block, index) => index > start && block.type === 'heading');
+  return blocks.slice(start + 1, end < 0 ? undefined : end);
+};
+
+const concise = (value, maxWords = 34) => {
+  const text = reportText(value);
+  const words = text.split(/\s+/);
+  return words.length > maxWords ? `${words.slice(0, maxWords).join(' ')}…` : text;
+};
+
+function drawOfferReport({ message, blocks, heading, paragraph, bullet }) {
+  const lead = blocks.find((block) => block.type === 'paragraph');
+  if (lead) {
+    heading('Decision summary');
+    paragraph(concise(lead.text, 55));
+  }
+
+  const stages = message.offerChecks?.stages || [];
+  const metrics = stages.find((stage) => stage.key === 'financial_loss');
+  const hazard = stages.find((stage) => stage.key === 'hazard_intensity');
+  if (metrics || hazard) {
+    heading('Key flood figures');
+    if (hazard) bullet(concise(hazard.summary, 24));
+    if (metrics) {
+      bullet(concise(metrics.summary, 24));
+      for (const item of (metrics.details || []).slice(0, 2)) bullet(concise(item, 20));
+    }
+  }
+
+  const checks = stages.find((stage) => stage.key === 'underwriting_checks');
+  const severityRank = (finding) => ({ HIGH: 0, MEDIUM: 1, LOW: 2 }[String(finding).match(/^(HIGH|MEDIUM|LOW):/)?.[1]] ?? 3);
+  const orderedFindings = [...(checks?.details || [])].sort((left, right) => severityRank(left) - severityRank(right));
+  const findings = orderedFindings.slice(0, 5);
+  if (findings.length) {
+    heading('Priority findings');
+    for (const finding of findings) bullet(concise(finding, 36));
+    if (orderedFindings.length > findings.length) paragraph(`${orderedFindings.length - findings.length} additional finding(s) omitted. See the offer checks for the full list.`);
+  }
+
+  const terms = reportSection(blocks, 'recommended terms').filter((block) => block.type === 'bullet').slice(0, 4);
+  if (terms.length) {
+    heading('Recommended terms');
+    for (const item of terms) bullet(concise(item.text, 28));
+  }
+
+  const questions = reportSection(blocks, 'questions for the broker').filter((block) => block.type === 'bullet').slice(0, 3);
+  if (questions.length) {
+    heading('Questions for the broker');
+    for (const item of questions) bullet(concise(item.text, 24));
+  }
+
+  const accumulation = stages.find((stage) => stage.key === 'accumulation');
+  if (accumulation?.status === 'blocked' && accumulation.summary) {
+    heading('Portfolio comparison');
+    paragraph(concise(accumulation.summary, 28));
+  }
+}
+
 export function buildChatReportPdf(message, { logoDataUrl, portfolioId, generatedAt = new Date() }) {
   if (!logoDataUrl) throw new Error('Kenya Re logo is required for the PDF report.');
   if (!message?.content) throw new Error('There is no completed chatbot answer to export.');
@@ -151,32 +216,24 @@ export function buildChatReportPdf(message, { logoDataUrl, portfolioId, generate
   });
   y += 23;
 
-  if (message.question) {
+  if (message.question && !message.offerChecks) {
     heading('Question');
-    paragraph(message.question);
+    paragraph(concise(message.question, 45));
   }
 
   const blocks = parseReportBlocks(message.content);
-  const lead = blocks[0]?.type === 'paragraph' ? blocks.shift() : null;
-  if (lead) { heading('Executive summary'); paragraph(lead.text); }
-  if (blocks.length) {
-    if (!blocks.some((block) => block.type === 'heading')) heading('Analysis');
-    for (const block of blocks) {
-      if (block.type === 'heading') heading(block.text);
-      else if (block.type === 'bullet') bullet(block.text);
-      else paragraph(block.text);
-    }
-  }
-
-  if (message.offerChecks?.stages?.length) {
-    heading('Placement checks');
-    paragraph('These checks apply to this offer only. They do not add the building to the portfolio or approve cover.');
-    for (const stage of message.offerChecks.stages) {
-      ensureSpace(13);
-      drawLines(`${stage.title || 'Check'} - ${(stage.status || 'review').toUpperCase()}`, { size: 10, leading: 5.5, color: NAVY, bold: true });
-      paragraph(stage.summary);
-      for (const detail of stage.details || []) bullet(detail);
-      y += 1;
+  if (message.offerChecks) {
+    drawOfferReport({ message, blocks, heading, paragraph, bullet });
+  } else {
+    const lead = blocks[0]?.type === 'paragraph' ? blocks.shift() : null;
+    if (lead) { heading('Executive summary'); paragraph(lead.text); }
+    if (blocks.length) {
+      if (!blocks.some((block) => block.type === 'heading')) heading('Analysis');
+      for (const block of blocks) {
+        if (block.type === 'heading') heading(block.text);
+        else if (block.type === 'bullet') bullet(block.text);
+        else paragraph(block.text);
+      }
     }
   }
 
@@ -189,7 +246,7 @@ export function buildChatReportPdf(message, { logoDataUrl, portfolioId, generate
     ...(message.reportAttachments || message.attachments || []),
     message.source,
     ...(message.citations || []).map(citationLabel),
-  ].filter(Boolean).map(reportText))];
+  ].filter(Boolean).map(reportText))].slice(0, 6);
   if (sources.length) {
     heading('Evidence and sources');
     for (const source of sources) bullet(source);

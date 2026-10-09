@@ -41,7 +41,7 @@ STAGE_INFO = {
     "hazard": ("1 Hazard", "Property table, hazard scores, hotspots, assumptions (D_max, RP map)", "Depth per property per tier, flood probability", "HAZ-07"),
     "vulnerability": ("2 Vulnerability", "Depth, housing class, curve parameters", "Damage ratio per property per tier, damage matrix", "VUL-06"),
     "exposure": ("3 Exposure", "Validated property table", "Totals, class/region splits, accumulation", "EXP-01"),
-    "financial": ("4 Financial engine", "Damage ratio, TIV, policy terms", "Ground-up loss per tier, EP curve, AAL", "FIN-01"),
+    "financial": ("4 Financial engine", "Damage ratio, TIV, policy and reinsurance terms (assumed)", "Ground-up, gross and net loss per tier, EP curves, AAL", "FIN-01"),
     "ai": ("5 AI layer", "Reports, free text, model outputs", "Extracted records, parsed rows, chat answers", "AI-02"),
     "portfolio": ("6 Portfolio and map", "All results", "Clusters, rankings, map layers", "PORT-02"),
     "trust": ("7 Trust", "Whole run", "Provenance mix, sensitivity, checks", "TRU-05"),
@@ -83,10 +83,10 @@ def num(value):
     return None if np.isnan(value) or np.isinf(value) else round(value, 6)
 
 
-def metric(id_, label, tag, priority, value=None, display=None, *, plain=None, status=None, note=None, chart=None, table=None) -> dict:
+def metric(id_, label, tag, priority, value=None, display=None, *, plain=None, status=None, note=None, chart=None, table=None, data=None) -> dict:
     return {"id": id_, "label": label, "plain": plain, "tag": tag, "priority": priority, "value": value,
             "display": display if display is not None else ("Not measured yet" if value is None else str(value)),
-            "status": status, "note": note, "chart": chart, "table": table}
+            "status": status, "note": note, "chart": chart, "table": table, "data": data}
 
 
 def not_measured(id_, label, tag, priority, reason, plain=None) -> dict:
@@ -435,9 +435,7 @@ def _financial(frame: pd.DataFrame, result: dict, run: ModelRun) -> list[dict]:
     per_property = [float(loss.loss_100_kes or 0) for loss in LossResult.query.filter_by(model_run_id=run.id)]
     top10 = sum(sorted(per_property, reverse=True)[:10]) / (sum(per_property) or 1) if per_property else None
     out.append(metric("FIN-11", "Loss concentration", "Model", "P2", num(top10), f"top 10 properties: {pct(top10)} of 1 in 100 loss" if top10 is not None else "n/a"))
-    out.append(not_measured("FIN-12", "Gross vs ground-up", "Model", "P2", "No policy terms (deductibles, limits) are loaded; losses are ground-up."))
-    out.append(not_measured("FIN-13", "Reinsurance recoveries", "Assumed", "P2", "Treaties are out of scope until the terms are confirmed."))
-    out.append(not_measured("FIN-14", "Gross vs net EP", "Model", "P2", "Needs policy and treaty terms."))
+    out.extend(_insurance_layers(result, labels, total))
     ratio = aal["aal_high"] / aal["aal_low"] if aal["aal_low"] else None
     out.append(metric("FIN-15", "Anchor sensitivity", "Model", "P1", num(ratio), f"AAL high/low = {ratio:.2f}" if ratio else "AAL low is 0", status=None if ratio is None else ("pass" if ratio <= 2 else "warn"),
                       note="Above 2 means the AAL depends heavily on the anchor/tail assumption." if ratio and ratio > 2 else None))
@@ -451,6 +449,77 @@ def _financial(frame: pd.DataFrame, result: dict, run: ModelRun) -> list[dict]:
     ordered = tier_losses.sort_values("rp")["loss_kes"].to_numpy()
     monotone = bool(np.all(np.diff(ordered) >= -1e-6))
     out.append(metric("FIN-17", "Loss monotonicity", "Model", "P1", int(monotone), "pass: loss rises with rarity" if monotone else "fail", status="pass" if monotone else "fail"))
+    return out
+
+
+def _worked_example(losses: pd.DataFrame) -> dict | None:
+    """One building followed through every step: the median-loss flooded building at 1 in 100."""
+    wet = losses[(losses["rp"] == 100) & (losses["loss_kes"] > 0)].sort_values("loss_kes")
+    if wet.empty:
+        return None
+    loc = wet.iloc[len(wet) // 2]["loc_id"]
+    rows = losses[losses["loc_id"] == loc].sort_values("rp")
+    first = rows.iloc[0]
+    return {"locId": loc, "housingClass": first["housing_class"], "tivKes": num(first["tiv_kes"]),
+            "deductibleKes": num(first["deductible_kes"]), "limitKes": num(first["limit_kes"]),
+            "steps": [{"rp": int(row.rp), "score": num(row.hazard_score), "depthM": num(row.depth_m), "damageRatio": num(row.damage_ratio),
+                       "groundUpKes": num(row.loss_kes), "grossKes": num(row.gross_kes)} for row in rows.itertuples()]}
+
+
+def _worked_example_metric(losses: pd.DataFrame) -> dict:
+    example = _worked_example(losses)
+    if example is None:
+        return not_measured("FIN-19", "Worked example", "Model + Assumed", "P2", "No building is flooded at 1 in 100.")
+    return metric("FIN-19", "Worked example", "Model + Assumed", "P2", example["steps"][-1]["groundUpKes"], f"{example['locId']} ({example['housingClass']}, {kes(example['tivKes'])})",
+                  plain="One real building through every step: score → depth → damage ratio → × value → ground-up → gross",
+                  table={"columns": ["Flood (assumed RP)", "Score", "Depth", "Damage ratio", "Ground-up", "Gross"],
+                         "rows": [[rp_label(step["rp"]), f"{step['score']:.2f}", f"{step['depthM']:.2f} m", pct(step["damageRatio"]), kes(step["groundUpKes"]), kes(step["grossKes"])] for step in example["steps"]]},
+                  data=example)
+
+
+def _insurance_layers(result: dict, labels: list[str], total: float) -> list[dict]:
+    """Ground-up -> gross (deductible, limit per building) -> net (quota share, then cat XL), per tier and as EP curves."""
+    tiers = result["tier_losses"]
+    financial = result["financial"]
+    terms = financial["terms"]
+    rows = [{"rp": int(row.rp), "groundUpKes": num(row.loss_kes), "ownerKeepsKes": num(row.retained_by_owner_kes), "aboveLimitKes": num(row.above_limit_kes),
+             "grossKes": num(row.gross_kes), "quotaShareKes": num(row.quota_share_kes), "catXlKes": num(row.cat_xl_kes), "netKes": num(row.net_kes)}
+            for row in tiers.itertuples()]
+    at100 = next((row for row in rows if row["rp"] == 100), rows[-1])
+    aal = {layer: financial["aal"][layer]["aal_central"] for layer in ("ground_up", "gross", "net")}
+    curves = financial["ep_curves"]
+    rp_axis = [num(v) for v in curves["ground_up"]["rp"]]
+    out = [
+        metric("FIN-12", "Gross vs ground-up", "Model + Assumed", "P1", at100["grossKes"], f"1 in 100: ground-up {kes(at100['groundUpKes'])} → gross {kes(at100['grossKes'])}",
+               plain="What the insurer owes after each building's deductible and limit",
+               note=f"Assumed terms: deductible {pct(terms['deductible_pct_tiv'])} of each building's value; limit {pct(terms['limit_pct_tiv'], 0)} of its value.",
+               chart={"type": "bar", "categories": labels, "series": [{"name": "Ground-up", "values": [num(r["groundUpKes"] / 1e6) for r in rows]}, {"name": "Gross", "values": [num(r["grossKes"] / 1e6) for r in rows]}], "unit": "KES m"}),
+        metric("FIN-13", "Reinsurance recoveries", "Model + Assumed", "P1", at100["quotaShareKes"] + at100["catXlKes"],
+               f"1 in 100: quota share {kes(at100['quotaShareKes'])} · cat XL {kes(at100['catXlKes'])}",
+               plain="What reinsurers pay back in each flood",
+               note=f"Assumed treaties: {pct(terms['quota_share_ceded'], 0)} quota share applied first; cat excess of loss {kes(terms['cat_xl_limit_kes'])} xs {kes(terms['cat_xl_attachment_kes'])} on the retained share.",
+               chart={"type": "stacked", "categories": labels, "series": [{"name": "Quota share", "values": [num(r["quotaShareKes"] / 1e6) for r in rows]}, {"name": "Cat XL", "values": [num(r["catXlKes"] / 1e6) for r in rows]}], "unit": "KES m"}),
+        metric("FIN-14", "Gross vs net EP", "Model + Assumed", "P1", at100["netKes"], f"1 in 100: gross {kes(at100['grossKes'])} → net {kes(at100['netKes'])}",
+               plain="Loss against rarity before insurance terms, after them, and after reinsurance",
+               chart={"type": "line", "x": rp_axis, "series": [{"name": name, "values": [num(v / 1e6) for v in curves[layer]["loss_kes"]]} for layer, name in (("ground_up", "Ground-up"), ("gross", "Gross"), ("net", "Net"))],
+                      "unit": "KES m", "xLabel": "Return period (years, log scale)", "yLabel": "Loss (KES m)", "logX": True}),
+        metric("FIN-18", "Loss waterfall", "Model + Assumed", "P1", at100["netKes"], f"net {pct(at100['netKes'] / at100['groundUpKes']) if at100['groundUpKes'] else 'n/a'} of ground-up at 1 in 100",
+               plain="How each flood's loss is split between owners, insurer and reinsurers",
+               table={"columns": ["Flood (assumed RP)", "Ground-up", "Owners keep (deductible)", "Above limit", "Gross", "Quota share", "Cat XL", "Net"],
+                      "rows": [[rp_label(r["rp"]), kes(r["groundUpKes"]), kes(r["ownerKeepsKes"]), kes(r["aboveLimitKes"]), kes(r["grossKes"]), kes(r["quotaShareKes"]), kes(r["catXlKes"]), kes(r["netKes"])] for r in rows]},
+               data={"tiers": rows}),
+        _worked_example_metric(result["losses"]),
+        metric("FIN-20", "AAL by layer", "Model + Assumed", "P1", num(aal["net"]), f"ground-up {kes(aal['ground_up'])} · gross {kes(aal['gross'])} · net {kes(aal['net'])}",
+               plain="Average yearly cost before terms, after policy terms, and after reinsurance",
+               data={key: num(value) for key, value in aal.items()}),
+        metric("FIN-21", "Financial assumptions", "Assumed", "P1", None, "tier return periods and insurance terms",
+               plain="Every number here is an assumption, not a supplied term",
+               table={"columns": ["Assumption", "Value"], "rows": [*[[f"Tier '{tier}' represents", f"1 in {int(rp)} years"] for tier, rp in sorted(result["assumptions"]["tier_rp"].items(), key=lambda item: item[1])],
+                                                              ["Deductible per building", f"{pct(terms['deductible_pct_tiv'])} of its value"], ["Limit per building", f"{pct(terms['limit_pct_tiv'], 0)} of its value"],
+                                                              ["Quota share ceded", pct(terms["quota_share_ceded"], 0)], ["Cat XL attachment", kes(terms["cat_xl_attachment_kes"])], ["Cat XL limit", kes(terms["cat_xl_limit_kes"])],
+                                                              ["Order", "deductible and limit per building, then quota share, then cat XL on the retained share"]]},
+               data={"tierRp": result["assumptions"]["tier_rp"], "terms": {key: num(value) for key, value in terms.items()}}),
+    ]
     return out
 
 

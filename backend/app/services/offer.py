@@ -213,8 +213,9 @@ def _flood_model(scores: dict[str, float], housing_class: str, tiv: float | None
     return result
 
 
-def _flag(flags: list, severity: str, title: str, detail: str) -> None:
-    flags.append({"severity": severity, "title": title, "detail": detail})
+def _flag(flags: list, severity: str, title: str, detail: str, quote: str | None = None) -> None:
+    """A check for the underwriter; quote is the submission text that triggered it, so the check can show its source."""
+    flags.append({"severity": severity, "title": title, "detail": detail, "quote": quote})
 
 
 def analyse(text: str, portfolio_id: str, today: date | None = None, *, include_portfolio_comparison: bool = False) -> dict:
@@ -233,9 +234,9 @@ def analyse(text: str, portfolio_id: str, today: date | None = None, *, include_
         bounds = fm.NAIROBI_BOUNDS
         analysis["inNairobi"] = bounds["lat_min"] <= lat <= bounds["lat_max"] and bounds["lon_min"] <= lon <= bounds["lon_max"]
         if facts["coordinates"]["ambiguous"]:
-            _flag(flags, "low", "Coordinate notation", f"'{facts['coordinates']['quote']}' uses both a minus sign and 'S'. Read as {lat:.5f}, {lon:.5f} (south of the equator); confirm with the broker.")
+            _flag(flags, "low", "Coordinate notation", f"'{facts['coordinates']['quote']}' uses both a minus sign and 'S'. Read as {lat:.5f}, {lon:.5f} (south of the equator); confirm with the broker.", facts["coordinates"]["quote"])
         if not analysis["inNairobi"]:
-            _flag(flags, "high", "Outside the model area", "The coordinates fall outside the Nairobi model domain, so the flood model cannot score this location.")
+            _flag(flags, "high", "Outside the model area", "The coordinates fall outside the Nairobi model domain, so the flood model cannot score this location.", facts["coordinates"]["quote"])
         # The scored hazard reference is a location lookup only. Do not use
         # portfolio buildings as an implicit substitute for this offer's inputs.
         reference = ReferenceData.load()
@@ -259,7 +260,7 @@ def analyse(text: str, portfolio_id: str, today: date | None = None, *, include_
         claim = next((line for line in statements if re.search(r"minimal|natural|confidence|low", line, re.I)), statements[0] if statements else None)
         if p >= 0.01 and claim:
             _flag(flags, "high", "Broker's flood view conflicts with the model",
-                  f"The offer says {claim!r}, but the model floods this site in the 1-in-{1 / p:.0f} scenario (about {p:.1%} a year).")
+                  f"The offer says {claim!r}, but the model floods this site in the 1-in-{1 / p:.0f} scenario (about {p:.1%} a year).", claim)
         elif p == 0:
             analysis["floodConsistent"] = True
         years = facts.get("historyYears")
@@ -272,7 +273,7 @@ def analyse(text: str, portfolio_id: str, today: date | None = None, *, include_
         detail = f"{basements} basement level(s). The model applies ground-level damage curves and does not model basement flooding, so it understates this exposure."
         if facts["basementPlant"]:
             detail += f" Critical plant below ground: {len(facts['basementPlant'])} items (for example {facts['basementPlant'][0]})."
-        _flag(flags, "high" if facts["basementPlant"] else "medium", "Basement exposure not modelled", detail)
+        _flag(flags, "high" if facts["basementPlant"] else "medium", "Basement exposure not modelled", detail, facts["basementPlant"][0] if facts["basementPlant"] else (facts.get("basements") or {}).get("quote"))
     floors = (facts.get("floorsAbove") or {}).get("value")
     if floors and floors >= 8:
         share = None
@@ -284,29 +285,29 @@ def analyse(text: str, portfolio_id: str, today: date | None = None, *, include_
         if share and model and model.get("loss100Kes") is not None:
             detail += (f" Ground and basement floors are {share:.0%} of floor area; scaling the modelled 1-in-100 loss to that share gives "
                        f"KES {model['loss100Kes'] * share:,.0f} instead of KES {model['loss100Kes']:,.0f} (a sensitivity, not a model output).")
-        _flag(flags, "medium", "High-rise outside the calibrated range", detail)
+        _flag(flags, "medium", "High-rise outside the calibrated range", detail, (facts.get("floorsAbove") or {}).get("quote"))
     rp = (facts.get("drainageDesignRp") or {}).get("value")
     if rp and rp < 100:
-        _flag(flags, "medium", "Drainage designed below the modelled scenarios", f"Storm drains are designed for a 1-in-{rp} event; the model's 1-in-100 and 1-in-250 scenarios exceed that design.")
+        _flag(flags, "medium", "Drainage designed below the modelled scenarios", f"Storm drains are designed for a 1-in-{rp} event; the model's 1-in-100 and 1-in-250 scenarios exceed that design.", (facts.get("drainageDesignRp") or {}).get("quote"))
     elevation, river_km, river_elevation = (facts.get(key, {}).get("value") for key in ("elevationM", "riverDistanceKm", "riverElevationM"))
     if elevation and river_km and river_elevation:
         grade = (elevation - river_elevation) / (river_km * 1000)
         if grade > 0.05:
             _flag(flags, "high", "Elevation claim is implausible",
                   f"The offer puts the site {elevation - river_elevation:,.0f} m above a river {river_km} km away, a {grade:.0%} average slope. "
-                  "That is not credible for central Nairobi, and the 'natural protection' argument relies on it. Ask for a survey or DEM extract.")
+                  "That is not credible for central Nairobi, and the 'natural protection' argument relies on it. Ask for a survey or DEM extract.", (facts.get("elevationM") or {}).get("quote"))
     if facts.get("floodLimit") and model and tiv:
         loss250 = model.get("loss250Kes") or 0
         _flag(flags, "low", "Flood limit versus modelled loss",
-              f"The offer proposes a flood limit at full TIV (KES {tiv:,.0f}); the modelled 1-in-250 building loss is KES {loss250:,.0f} ({loss250 / tiv:.1%} of TIV), before basement plant and business interruption.")
+              f"The offer proposes a flood limit at full TIV (KES {tiv:,.0f}); the modelled 1-in-250 building loss is KES {loss250:,.0f} ({loss250 / tiv:.1%} of TIV), before basement plant and business interruption.", (facts.get("floodLimit") or {}).get("quote"))
     expiry = facts.get("expiry")
     if expiry:
         days = (date.fromisoformat(expiry["value"]) - today).days
         analysis["daysToExpiry"] = days
         if days < 0:
-            _flag(flags, "high", "Offer expired", f"The offer expired {-days} day(s) ago.")
+            _flag(flags, "high", "Offer expired", f"The offer expired {-days} day(s) ago.", expiry["quote"])
         elif days <= 7:
-            _flag(flags, "low", "Short deadline", f"The offer expires in {days} day(s).")
+            _flag(flags, "low", "Short deadline", f"The offer expires in {days} day(s).", expiry["quote"])
     if not tiv:
         _flag(flags, "medium", "No insured value found", "The offer has no TIV or sum insured, so losses cannot be expressed in KES.")
     order = {"high": 0, "medium": 1, "low": 2}
@@ -326,24 +327,37 @@ def stage_report(analysis: dict) -> dict:
     tiv = (facts.get("tivKes") or {}).get("value")
     stages = []
 
-    def add(key: str, title: str, status: str, summary: str, details: list[str]) -> None:
-        stages.append({"key": key, "title": title, "status": status, "summary": summary, "details": details})
+    def add(key: str, title: str, status: str, summary: str, details: list[str], visual: dict | None = None) -> None:
+        stages.append({"key": key, "title": title, "status": status, "summary": summary,
+                       "details": details, "visual": visual})
 
     extracted = [key for key, value in facts.items() if isinstance(value, dict) and "value" in value]
     add("data_extraction", "Data extraction", "complete" if coords else "warning",
         f"{len(extracted)} offer facts identified; {analysis['redactions']} personal-contact references redacted before AI use.",
         [f"Coordinates: {coords['lat']:.5f}, {coords['lon']:.5f}" if coords else "Coordinates missing; site-specific model checks are blocked.",
-         f"Insured value: {_kes(tiv)}", f"Construction class: {facts['housingClass']['value']}"])
+         f"Insured value: {_kes(tiv)}", f"Construction class: {facts['housingClass']['value']}"],
+        {"type": "facts", "rows": [
+            {"label": "Offer facts", "value": str(len(extracted))},
+            {"label": "Insured value", "value": _kes(tiv)},
+            {"label": "Construction", "value": CLASS_LABEL.get(facts['housingClass']['value'], facts['housingClass']['value'])},
+            {"label": "Location", "value": f"{coords['lat']:.5f}, {coords['lon']:.5f}" if coords else "Not supplied"},
+        ]})
 
     if hazard and model:
         add("hazard_intensity", "Hazard intensity", "complete",
             "Five scenario scores converted to proxy depths; these are not measured flood depths.",
             [f"Reference method: {hazard['method']}; nearest scored point {hazard['nearestKm']:.2f} km away."]
-            + [f"1-in-{row['rp']} {row['tier']}: score {row['score']:.3f}, proxy depth {row['depthM']:.2f} m." for row in model["tiers"]])
+            + [f"1-in-{row['rp']} {row['tier']}: score {row['score']:.3f}, proxy depth {row['depthM']:.2f} m." for row in model["tiers"]],
+            {"type": "bars", "unit": "score", "max": 1, "rows": [
+                {"label": f"1-in-{row['rp']}", "value": row["score"], "display": f"{row['score']:.2f}",
+                 "detail": f"Proxy depth {row['depthM']:.2f} m"} for row in model["tiers"]]})
         vulnerable = [flag["detail"] for flag in flags if flag["title"] in ("Basement exposure not modelled", "High-rise outside the calibrated range")]
         add("vulnerability", "Vulnerability", "warning" if vulnerable else "complete",
             f"Applied the {CLASS_LABEL.get(facts['housingClass']['value'], facts['housingClass']['value'])} damage curve to the scenario proxy depths.",
-            [f"1-in-{row['rp']} {row['tier']}: mean damage ratio {row['damageRatio']:.1%}." for row in model["tiers"]] + vulnerable)
+            [f"1-in-{row['rp']} {row['tier']}: mean damage ratio {row['damageRatio']:.1%}." for row in model["tiers"]] + vulnerable,
+            {"type": "bars", "unit": "damage ratio", "max": 1, "rows": [
+                {"label": f"1-in-{row['rp']}", "value": row["damageRatio"],
+                 "display": f"{row['damageRatio']:.1%}"} for row in model["tiers"]]})
     else:
         reason = "No coordinates were supplied." if not coords else "Coordinates are outside the Nairobi model area or no scored reference points are available."
         add("hazard_intensity", "Hazard intensity", "blocked", reason, ["No flood depth or intensity was invented."])
@@ -353,7 +367,13 @@ def stage_report(analysis: dict) -> dict:
         add("financial_loss", "Financial loss", "complete", f"Central AAL {_kes(model['aalKes'])}; 1-in-100 loss {_kes(model['loss100Kes'])}.",
             [f"AAL range: {_kes(model['aalLowKes'])} to {_kes(model['aalHighKes'])}.",
              f"1-in-250 loss: {_kes(model['loss250Kes'])}."]
-            + [f"1-in-{row['rp']} {row['tier']}: building loss {_kes(row['lossKes'])}." for row in model["tiers"]])
+            + [f"1-in-{row['rp']} {row['tier']}: building loss {_kes(row['lossKes'])}." for row in model["tiers"]],
+            {"type": "bars", "unit": "building loss (KES)", "highlights": [
+                {"label": "Average annual loss", "value": _kes(model["aalKes"])},
+                {"label": "1-in-100 loss", "value": _kes(model["loss100Kes"])},
+            ], "rows": [
+                {"label": f"1-in-{row['rp']}", "value": row["lossKes"],
+                 "display": _kes(row["lossKes"])} for row in model["tiers"]]})
     else:
         add("financial_loss", "Financial loss", "blocked", "Cannot calculate losses without both hazard intensity and insured value.", ["No monetary loss was invented."])
 
@@ -363,7 +383,12 @@ def stage_report(analysis: dict) -> dict:
             details.append(f"{accumulation['runStatus']} portfolio run {accumulation['runId']}: combined AAL {_kes(accumulation.get('aalKes'))}; 1-in-100 loss {_kes(accumulation.get('loss100Kes'))}.")
         else:
             details.append("No portfolio model run is linked to these nearby assets; their losses are not asserted.")
-        add("accumulation", "Portfolio accumulation", "complete", details[0], details)
+        add("accumulation", "Portfolio accumulation", "complete", details[0], details,
+            {"type": "facts", "rows": [
+                {"label": "Nearby assets", "value": str(accumulation.get("count", 0))},
+                {"label": "Combined insured value", "value": _kes(accumulation.get("tivKes"))},
+                {"label": "Distance", "value": f"Within {ACCUMULATION_KM:g} km"},
+            ]})
     else:
         reason = ("No coordinates were supplied, so a nearby-portfolio comparison cannot be made." if not coords
                   else "Not assessed for this single offer; a portfolio comparison must be requested separately.")
@@ -372,10 +397,45 @@ def stage_report(analysis: dict) -> dict:
 
     add("underwriting_checks", "Underwriting checks", "warning" if flags else "complete",
         f"{len(flags)} findings; {sum(flag['severity'] == 'high' for flag in flags)} high priority.",
-        [f"{flag['severity'].upper()}: {flag['title']} — {flag['detail']}" for flag in flags] or ["No rule-based flags were raised; this is not an approval."])
+        [f"{flag['severity'].upper()}: {flag['title']} — {flag['detail']}" for flag in flags] or ["No rule-based flags were raised; this is not an approval."],
+        {"type": "findings", "rows": [
+            {"label": flag["title"], "severity": flag["severity"]} for flag in flags]})
     add("human_review", "Human review", "review", "Awaiting an underwriter's judgement; no coverage or portfolio asset was approved.",
-        ["Check the broker's values, basement exposure, model assumptions and terms before any decision."])
+        ["Check the broker's values, basement exposure, model assumptions and terms before any decision."],
+        {"type": "checklist", "rows": [
+            {"label": "Verify broker values"}, {"label": "Review exclusions and basement exposure"},
+            {"label": "Confirm assumptions and terms"}]})
     return {"type": "placement_offer", "status": "review", "stages": stages}
+
+
+MAX_DECISION_CHECKS = 5
+# Checks that change what the model's numbers mean; any of these makes confidence low.
+NUMBER_CHANGING = {"Hazard estimate is approximate", "Basement exposure not modelled", "High-rise outside the calibrated range", "No hazard data",
+                   "No coordinates", "Outside the model area", "No insured value found"}
+
+
+def decision_summary(analysis: dict, source_label: str, subject_ref: str) -> dict:
+    """What the underwriter needs to decide: the numbers, at most five checks (high first), and how far to trust them."""
+    facts, model, flags = analysis["facts"], analysis.get("model") or {}, analysis["flags"]
+    tiv = (facts.get("tivKes") or {}).get("value")
+    value = lambda key: (facts.get(key) or {}).get("value")
+    name = value("address") or value("client") or value("reference") or "Placement offer"
+    reasons = ["The hazard is a terrain proxy, not measured flood depth.", "The return period of each flood tier is assumed."]
+    number_changing = [flag["title"] for flag in flags if flag["title"] in NUMBER_CHANGING]
+    reasons += [f"{title}." for title in number_changing]
+    if not model.get("loss100Kes"):
+        reasons.append("No loss could be calculated, so there is no number to decide on.")
+    level = "low" if number_changing or not model.get("loss100Kes") else "medium"  # never high while the hazard is a proxy
+    return {
+        "kind": "offer", "subjectRef": subject_ref, "name": name, "reference": value("reference"),
+        "expiry": value("expiry"), "daysToExpiry": analysis.get("daysToExpiry"),
+        "numbers": {"tivKes": tiv, "loss100Kes": model.get("loss100Kes"), "loss250Kes": model.get("loss250Kes"),
+                    "aalLowKes": model.get("aalLowKes"), "aalHighKes": model.get("aalHighKes"), "floodLimit": value("floodLimit")},
+        "checks": [{"severity": flag["severity"], "title": flag["title"], "detail": flag["detail"],
+                    "source": {"label": source_label, "quote": flag.get("quote")}} for flag in flags[:MAX_DECISION_CHECKS]],
+        "moreChecks": max(0, len(flags) - MAX_DECISION_CHECKS),
+        "confidence": {"level": level, "reasons": reasons},
+    }
 
 
 def evidence_text(analysis: dict) -> str:

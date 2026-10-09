@@ -56,6 +56,54 @@ DEFAULT_VULN = {
 }
 
 
+# Insurance and reinsurance terms. The cedant has not supplied any, so these are stated, editable assumptions:
+# per-building deductible and limit as shares of TIV; a quota share; and one cat excess-of-loss layer sized from portfolio TIV.
+DEFAULT_FINANCIAL_TERMS = {
+    "deductible_pct_tiv": 0.01,
+    "limit_pct_tiv": 1.0,
+    "quota_share_ceded": 0.25,
+    "cat_xl_attachment_pct_tiv": 0.005,
+    "cat_xl_limit_pct_tiv": 0.02,
+}
+
+
+def resolve_financial_terms(terms: Mapping[str, float] | None, total_tiv: float) -> dict:
+    """Defaults overlaid with supplied terms; the cat XL layer in KES unless given directly."""
+    resolved = {**DEFAULT_FINANCIAL_TERMS, **(terms or {})}
+    for key in ("deductible_pct_tiv", "quota_share_ceded", "cat_xl_attachment_pct_tiv", "cat_xl_limit_pct_tiv"):
+        if not 0 <= float(resolved[key]) <= 1:
+            raise ValueError(f"{key} must be between 0 and 1")
+    if float(resolved["limit_pct_tiv"]) <= 0:
+        raise ValueError("limit_pct_tiv must be positive")
+    resolved["cat_xl_attachment_kes"] = float(resolved.get("cat_xl_attachment_kes") or resolved["cat_xl_attachment_pct_tiv"] * total_tiv)
+    resolved["cat_xl_limit_kes"] = float(resolved.get("cat_xl_limit_kes") or resolved["cat_xl_limit_pct_tiv"] * total_tiv)
+    return resolved
+
+
+def apply_policy_terms(losses: pd.DataFrame, terms: Mapping[str, float]) -> pd.DataFrame:
+    """Per building and scenario: gross = min(max(ground-up - deductible, 0), limit)."""
+    out = losses.copy()
+    tiv = out["tiv_kes"].to_numpy(dtype=float)
+    ground_up = out["loss_kes"].to_numpy(dtype=float)
+    deductible = float(terms["deductible_pct_tiv"]) * tiv
+    limit = float(terms["limit_pct_tiv"]) * tiv
+    out["deductible_kes"] = deductible
+    out["limit_kes"] = limit
+    out["gross_kes"] = np.minimum(np.maximum(ground_up - deductible, 0.0), limit)
+    out["retained_by_owner_kes"] = np.minimum(ground_up, deductible)
+    out["above_limit_kes"] = np.maximum(ground_up - deductible - limit, 0.0)
+    return out
+
+
+def apply_reinsurance(gross: Iterable[float] | float, terms: Mapping[str, float]) -> dict[str, np.ndarray]:
+    """Per scenario (one event): the quota share takes its share of gross first; the cat XL then protects what the insurer keeps."""
+    gross = np.asarray(gross, dtype=float)
+    quota_share = gross * float(terms["quota_share_ceded"])
+    retained = gross - quota_share
+    cat_xl = np.clip(retained - float(terms["cat_xl_attachment_kes"]), 0.0, float(terms["cat_xl_limit_kes"]))
+    return {"quota_share_kes": quota_share, "retained_after_qs_kes": retained, "cat_xl_kes": cat_xl, "net_kes": retained - cat_xl}
+
+
 def validate_tier_rp(tier_rp: Mapping[str, float]) -> list[str]:
     """Return issues; a valid mapping is strictly increasing with rarity."""
     issues = []
@@ -308,6 +356,7 @@ def run_model(
     hotspots: pd.DataFrame | None = None,
     apply_uplift: bool = False,
     uplift_radius_km: float = 1.0,
+    financial_terms: Mapping[str, float] | None = None,
 ) -> dict:
     """Run property-to-portfolio loss calculations and build the EP/AAL output."""
     rp_issues = validate_tier_rp(tier_rp)
@@ -345,12 +394,22 @@ def run_model(
         })
         loss_frames.append(frame)
     losses = pd.concat(loss_frames, ignore_index=True).sort_values(["loc_id", "rp"]).reset_index(drop=True)
+    terms = resolve_financial_terms(financial_terms, float(clean["tiv_kes"].sum()))
+    losses = apply_policy_terms(losses, terms)
     tier_losses = losses.groupby(["tier", "rp"], as_index=False).agg(loss_kes=("loss_kes", "sum"), exposed_tiv_kes=("tiv_kes", lambda values: float(values[losses.loc[values.index, "depth_m"] > 0].sum())))
-    tier_losses = tier_losses.sort_values("rp").reset_index(drop=True)
+    policy = losses.groupby("rp", as_index=False)[["gross_kes", "retained_by_owner_kes", "above_limit_kes"]].sum()
+    tier_losses = tier_losses.merge(policy, on="rp").sort_values("rp").reset_index(drop=True)
+    for column, values in apply_reinsurance(tier_losses["gross_kes"], terms).items():
+        tier_losses[column] = values
     total_tiv = float(clean["tiv_kes"].sum())
     tier_losses["loss_ratio"] = tier_losses["loss_kes"] / total_tiv
     ep_curve = build_ep_curve(tier_losses[["rp", "loss_kes"]])
     aal = compute_aal(ep_curve)
+    # Same EP construction for each layer of the loss, so ground-up, gross and net are directly comparable.
+    layer_curves = {layer: build_ep_curve(tier_losses[["rp", column]].rename(columns={column: "loss_kes"}))
+                    for layer, column in (("ground_up", "loss_kes"), ("gross", "gross_kes"), ("net", "net_kes"))}
+    financial = {"terms": terms, "ep_curves": layer_curves, "aal": {layer: compute_aal(curve) for layer, curve in layer_curves.items()},
+                 "order": ["ground_up", "deductible and limit per building", "gross", "quota share", "cat excess of loss", "net"]}
     first_flood = losses[losses["depth_m"] > 0].groupby("loc_id", as_index=False)["rp"].min().rename(columns={"rp": "rp_first"})
     first_flood["p_flood"] = 1 / first_flood["rp_first"]
     by_class = losses.groupby(["tier", "rp", "housing_class"], as_index=False)["loss_kes"].sum()
@@ -365,10 +424,11 @@ def run_model(
         "ep_curve": ep_curve,
         "aal": aal,
         "aal_percent_tiv": aal["aal_central"] / total_tiv if total_tiv else None,
+        "financial": financial,
         "flood_probability": first_flood,
         "local_accumulation": local_accumulation(clean),
         "hotspot_validation": validate_hotspots(clean, hotspots),
-        "assumptions": {"tier_rp": dict(tier_rp), "d_max_m": d_max, "wet_threshold_m": wet_threshold, "rare_tail": "held flat", "annual_anchor": {"rp": 1, "loss_kes": 0}},
+        "assumptions": {"tier_rp": dict(tier_rp), "d_max_m": d_max, "wet_threshold_m": wet_threshold, "rare_tail": "held flat", "annual_anchor": {"rp": 1, "loss_kes": 0}, "financial_terms": terms},
     }
 
 

@@ -222,7 +222,7 @@ function Scatter({ chart }) {
   </svg><Tooltip tip={tip}/></div>;
 }
 
-function Chart({ chart }) {
+export function Chart({ chart }) {
   if (chart.type === 'bar') return <BarChart chart={chart}/>;
   if (chart.type === 'stacked') return <BarChart chart={chart} stacked/>;
   if (chart.type === 'line') return <LineChart chart={chart}/>;
@@ -326,7 +326,7 @@ function MetricCard({ metric, runId }) {
     </header>
     <div className="sm-headline"><span className="sm-display">{metric.display}</span>{StatusIcon && <span className={`sm-status ${metric.status}`}><StatusIcon size={13}/>{statusLabel}</span>}</div>
     {metric.plain && <p className="sm-plain">{metric.plain}</p>}
-    {metric.note && <p className="sm-note">{metric.note}</p>}
+    {metric.note && <details className="sm-note-details"><summary>Assumptions and caveats</summary><p className="sm-note">{metric.note}</p></details>}
     {metric.chart && <div ref={chartRef}><Chart chart={metric.chart}/></div>}
     {metric.table && (showTable || !metric.chart) && <div className="sm-table-wrap"><table className="sm-table"><thead><tr>{metric.table.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{metric.table.rows.map((row, index) => <tr key={index}>{row.map((cell, ci) => <td key={ci} className={cell === 'pass' ? 'pass' : cell === 'fail' ? 'fail' : cell === 'warn' ? 'warn' : undefined}>{cell}</td>)}</tr>)}</tbody></table></div>}
     {(metric.chart || metric.table) && <footer>
@@ -370,10 +370,11 @@ function StageAgent({ runId, stageKey, stageTitle }) {
 }
 
 export default function StageDrawer({ node, nodes, onSelect, onClose, runId, runStatus, metrics, loading, error }) {
+  const [showAgent, setShowAgent] = useState(false);
   const stageKey = NODE_STAGE[node.id];
   const stage = metrics?.stages?.[stageKey];
   const index = nodes.findIndex((item) => item.id === node.id);
-  const groups = useMemo(() => ['P1', 'P2', 'P3'].map((priority) => [priority, (stage?.metrics || []).filter((item) => item.priority === priority)]).filter(([, items]) => items.length), [stage]);
+  const groups = useMemo(() => ['P1', 'P2', 'P3'].map((priority) => [priority, (stage?.metrics || []).filter((item) => item.priority === priority).sort((a, b) => Number(!!b.chart) - Number(!!a.chart) || Number(!!b.table) - Number(!!a.table))]).filter(([, items]) => items.length), [stage]);
   const preferred = stage?.metrics.find((item) => item.id === stage.headline);
   const headline = preferred && preferred.value != null ? preferred : stage?.metrics.find((item) => item.priority === 'P1' && item.value != null) || preferred;
   const substituted = headline && preferred && headline.id !== preferred.id ? `${preferred.id} ${preferred.label} is not measured yet` : null;
@@ -390,20 +391,23 @@ export default function StageDrawer({ node, nodes, onSelect, onClose, runId, run
         <button disabled={!stage} onClick={() => downloadStage('csv')} title="Download this stage's metrics as CSV"><FileSpreadsheet size={14}/> CSV</button>
         <button disabled={!stage} onClick={() => downloadStage('json')} title="Download this stage's metrics as JSON"><FileJson size={14}/> JSON</button>
         <button disabled={!metrics} onClick={downloadAll} title="Download every stage's metrics"><Download size={14}/> All stages</button>
+        {runId && <button onClick={() => setShowAgent((value) => !value)} aria-expanded={showAgent}><Bot size={14}/>{showAgent ? 'Hide assistant' : 'Ask assistant'}</button>}
         <button className="sd-close" onClick={onClose} title="Close"><X size={17}/></button>
       </div>
       {headline && <div className="sd-headline"><span>{headline.id} · {headline.label}</span><strong>{headline.display}</strong>{(headline.plain || substituted) && <small>{[headline.plain, substituted && `(${substituted}; showing ${headline.id})`].filter(Boolean).join(' ')}</small>}</div>}
       <nav className="sd-steps">{nodes.map((item) => <button key={item.id} className={item.id === node.id ? 'active' : ''} onClick={() => onSelect(item.id)}>{item.step} {item.title}</button>)}</nav>
     </header>
-    <div className="sd-body">
+    <div className={`sd-body ${showAgent ? 'with-agent' : ''}`}>
       <div className="sd-metrics">
         {!runId && <div className="sd-empty"><strong>No model run yet</strong><span>Run the workflow (or ask a loss question in chat) to calculate this stage's metrics.</span></div>}
         {runId && loading && <div className="sd-empty"><Loader2 size={18} className="spin"/><strong>Calculating metrics…</strong></div>}
         {runId && error && <div className="sd-empty error"><AlertTriangle size={18}/><strong>Metrics unavailable</strong><span>{error}</span></div>}
-        {stage && groups.map(([priority, items]) => <section key={priority} className="sd-group"><h3>{PRIORITY_TITLE[priority]} <em>{priority} · {items.length}</em></h3><div className={`sd-grid ${priority.toLowerCase()}`}>{items.map((item) => <MetricCard key={item.id} metric={item} runId={runId}/>)}</div></section>)}
+        {stage && groups.map(([priority, items]) => priority === 'P1'
+          ? <section key={priority} className="sd-group"><h3>Key figures <em>{items.length}</em></h3><div className="sd-grid p1">{items.map((item) => <MetricCard key={item.id} metric={item} runId={runId}/>)}</div></section>
+          : <details key={`${stageKey}-${priority}`} className="sd-group sd-more"><summary>{PRIORITY_TITLE[priority]} <em>{items.length} figures</em></summary><div className={`sd-grid ${priority.toLowerCase()}`}>{items.map((item) => <MetricCard key={item.id} metric={item} runId={runId}/>)}</div></details>)}
         <div className="sd-nav"><button disabled={index <= 0} onClick={() => onSelect(nodes[index - 1].id)}><ChevronLeft size={13}/> Previous stage</button><span>{index + 1} of {nodes.length}</span><button disabled={index >= nodes.length - 1} onClick={() => onSelect(nodes[index + 1].id)}>Next stage <ChevronRight size={13}/></button></div>
       </div>
-      {runId && <StageAgent runId={runId} stageKey={stageKey} stageTitle={node.title}/>}
+      {runId && showAgent && <StageAgent runId={runId} stageKey={stageKey} stageTitle={node.title}/>}
     </div>
   </aside>;
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -87,7 +88,7 @@ def _run_label(run: ModelRun) -> str:
 
 
 MODEL_QUESTION = re.compile(r"loss|aal|annual|damage|risk|exposure|exposed|flood|probab|return period|1-in|ep curve|exceed|scenario|model|run|report|underwrit|premium|accumulat", re.I)
-PORTFOLIO_COMPARISON = re.compile(r"\b(?:accumulat\w*|portfolio comparison|compare with (?:the )?portfolio|nearby insured (?:assets|properties))\b", re.I)
+PORTFOLIO_COMPARISON = re.compile(r"\b(?:portfolio (?:accumulat\w*|comparison)|compare (?:this offer|the offer|it) with (?:the )?portfolio|compare with (?:the )?portfolio|nearby insured (?:assets|properties))\b", re.I)
 MAX_OFFER_CONTEXT_CHARS = 120_000
 
 
@@ -186,11 +187,11 @@ def respond(payload: dict) -> dict:
     upload_ids = context.get("uploadIds") or []
     if not isinstance(upload_ids, list) or any(not isinstance(item, str) for item in upload_ids):
         raise ChatError("context.uploadIds must be a list of source IDs.")
-    if context.get("offerText") and context.get("offerUploadId"):
+    if "offerText" in context and "offerUploadId" in context:
         raise ChatError("Select one offer context, not both pasted text and an uploaded offer.")
     if offer.is_offer(question):
         return _respond_to_offer(question, portfolio_id)
-    if context.get("offerText"):
+    if "offerText" in context:
         offer_text = context["offerText"]
         if not isinstance(offer_text, str) or len(offer_text) > MAX_OFFER_CONTEXT_CHARS or not offer.is_offer(offer_text):
             raise ChatError("The carried offer context is invalid or too long; select the offer again.")
@@ -198,7 +199,7 @@ def respond(payload: dict) -> dict:
             raise ChatError("A carried offer cannot be mixed with other selected data sources. Clear the offer first.")
         return _respond_to_offer(offer_text, portfolio_id, question=question,
                                  include_portfolio_comparison=bool(PORTFOLIO_COMPARISON.search(question)))
-    if context.get("offerUploadId"):
+    if "offerUploadId" in context:
         if upload_ids and upload_ids != [context["offerUploadId"]]:
             raise ChatError("A carried offer cannot be mixed with other selected data sources. Clear the offer first.")
         upload, document_text = _offer_document(portfolio_id, context["offerUploadId"])
@@ -246,8 +247,8 @@ def respond(payload: dict) -> dict:
 
 
 def _offer_document(portfolio_id: str, upload_id: str) -> tuple[Upload, str]:
-    if not isinstance(upload_id, str):
-        raise ChatError("context.offerUploadId must be an uploaded document ID.")
+    if not isinstance(upload_id, str) or not upload_id.strip():
+        raise ChatError("The carried offer upload is missing; select the offer again.")
     upload = Upload.query.filter_by(id=upload_id, portfolio_id=portfolio_id).first()
     if upload is None:
         raise ChatError("The selected offer was not found in this portfolio.", 404)
@@ -281,11 +282,14 @@ def _respond_to_offer(text: str, portfolio_id: str, source_upload: Upload | None
         citations.append({"runId": accumulation["runId"]})
     model_view = analysis.get("model") or {}
     asset = {"kind": "offer", "name": (analysis["facts"].get("client") or {}).get("value") or "Pasted offer", "lat": coords["lat"], "lng": coords["lon"],
+             "portfolioComparison": bool(accumulation),
              "annualFloodProbability": model_view.get("annualFloodProbability"), "aalKes": model_view.get("aalKes"), "loss100Kes": model_view.get("loss100Kes"),
              "flags": analysis["flags"]} if coords else None
     source_name = source_upload.filename if source_upload else "Pasted placement offer"
+    subject_ref = f"upload:{source_upload.id}" if source_upload else f"offer:{hashlib.sha256(analysis['redactedText'].encode()).hexdigest()[:16]}"
     return {"answer": answer, "asset": asset, "source": f"{source_name} (contact details redacted)", "citations": citations, "actions": [],
-            "workflow": None, "offerChecks": checks, "provider": provider, "model": model, "dummy": False}
+            "workflow": None, "offerChecks": checks, "decision": offer.decision_summary(analysis, source_name, subject_ref),
+            "provider": provider, "model": model, "dummy": False}
 
 
 def _dedupe(citations: list[dict]) -> list[dict]:

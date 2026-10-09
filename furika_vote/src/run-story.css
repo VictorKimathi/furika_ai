@@ -1,0 +1,203 @@
+/* Underwriter summary: the run read top to bottom as a story (Kenya Re navy, red accent). */
+.workflow-story{min-height:0;flex:1;overflow:auto;background:#f4f7fb}
+.run-story{max-width:880px;margin:0 auto;padding:18px 20px 28px;display:flex;flex-direction:column;gap:12px;color:#173650}
+
+.rs-bottom-line{padding:18px 20px;color:#fff;background:linear-gradient(135deg,#041d3b 0%,#0b2d57 100%);border-radius:14px;box-shadow:0 8px 22px rgba(4,29,59,.18)}
+.rs-kicker{color:#f3a1b6;font:600 11.5px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.rs-kpis{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rs-kpis>div{padding:12px 14px;display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,.08);border-radius:10px}
+.rs-kpis span{color:#b9c7d8;font-size:12.5px}
+.rs-kpis strong{font-size:24px;letter-spacing:-.02em;line-height:1.15}
+.rs-kpis small{color:#b9c7d8;font-size:12px}
+.rs-flags{margin-top:14px;padding:12px 14px;background:#fff;border-left:4px solid #eda100;border-radius:10px;color:#173650}
+.rs-flags>strong{display:flex;align-items:center;gap:7px;font-size:14px}
+.rs-flags>strong svg{color:#b97800}
+.rs-flags.clear{border-left-color:#1baf7a}
+.rs-flags.clear>strong svg{color:#11845b}
+.rs-flags ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.rs-flags li button{width:100%;padding:7px 8px 7px 22px;position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;border-radius:7px;color:#173650;background:transparent;font-size:13.5px;text-align:left;cursor:pointer}
+.rs-flags li button:before{content:'';position:absolute;left:8px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:#eda100}
+.rs-flags li.fail button:before{background:#d03b3b}
+.rs-flags li button:hover{background:#f1f5fa}
+.rs-flags li button svg{flex:0 0 auto;color:#8a94a0}
+
+.rs-chapter{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;padding:16px 18px;background:#fff;border:1px solid #dfe6ee;border-radius:14px}
+.rs-step{width:28px;height:28px;display:grid;place-items:center;color:#fff;background:#041d3b;border-radius:50%;font:600 13px var(--mono)}
+.rs-chapter.warn .rs-step{background:#b97800}
+.rs-chapter h3{margin:3px 0 4px;color:#041d3b;font-size:17px;letter-spacing:-.01em}
+.rs-answer{margin:0;max-width:62ch;color:#173650;font-size:15px;line-height:1.5}
+.rs-facts{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px 18px}
+.rs-facts>div{display:flex;align-items:baseline;gap:6px;font-size:13px}
+.rs-facts dt{color:#5b6c7d}
+.rs-facts dd{margin:0;display:inline-flex;align-items:center;gap:4px;color:#041d3b;font-weight:700}
+.rs-facts .pass dd svg{color:#11845b}
+.rs-facts .warn dd svg{color:#b97800}
+.rs-facts .fail dd svg{color:#d03b3b}
+.rs-figure{margin:12px 0 0}
+.rs-figure figcaption{margin-bottom:4px;color:#5b6c7d;font-size:12.5px;font-weight:600}
+.rs-figure .sm-chart{max-width:600px}
+.rs-table{margin-top:10px;border-collapse:collapse;font-size:13px}
+.rs-table th,.rs-table td{padding:6px 12px 6px 0;border-bottom:1px solid #e3e8ee;text-align:left}
+.rs-table th{color:#5b6c7d;font-weight:600}
+.rs-list{margin-top:10px;font-size:13px}
+.rs-list summary{color:#1c5cab;font-weight:600;cursor:pointer}
+.rs-list ul{margin:6px 0 0;padding-left:18px;line-height:1.6}
+.rs-more{margin-top:10px;padding:0;display:inline-flex;align-items:center;gap:3px;border:0;color:#1c5cab;background:none;font-size:13px;font-weight:600;cursor:pointer}
+.rs-more:hover{text-decoration:underline}
+
+.rs-decision{padding:16px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:2px solid #041d3b;border-radius:14px}
+.rs-decision>svg{color:#d11242;flex:0 0 auto}
+.rs-decision>div:first-of-type{flex:1;min-width:220px;display:flex;flex-direction:column;gap:2px}
+.rs-decision strong{color:#041d3b;font-size:16px}
+.rs-decision span{color:#5b6c7d;font-size:13.5px}
+.rs-decision.approved{border-color:#1baf7a}
+.rs-decision.approved>svg{color:#11845b}
+.rs-decision-actions{display:flex;gap:8px}
+.rs-decision-actions button{height:38px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid #c5d0dc;border-radius:9px;color:#173650;background:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.rs-decision-actions button.primary{color:#fff;background:#041d3b;border-color:#041d3b}
+.rs-decision-actions button:disabled{opacity:.5;cursor:not-allowed}
+.rs-guardrail{margin:2px 0 0;color:#6b7a8b;font-size:12px;text-align:center}
+
+.rs-empty{min-height:260px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#5b6c7d;text-align:center}
+.rs-empty strong{color:#041d3b;font-size:16px}
+.rs-empty.error svg{color:#d03b3b}
+.rs-empty button{margin-top:6px;height:36px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:0;border-radius:9px;color:#fff;background:#041d3b;font-weight:600;cursor:pointer}
+
+/* Summary / Pipeline switch in the workflow toolbar */
+.workflow-view-switch{display:inline-flex;padding:3px;background:#edf1f6;border-radius:9px}
+.workflow-view-switch button{height:28px;padding:0 12px;border:0;border-radius:7px;color:#5b6c7d;background:transparent;font-size:13px;font-weight:600;cursor:pointer}
+.workflow-view-switch button.active{color:#041d3b;background:#fff;box-shadow:0 1px 3px rgba(4,29,59,.15)}
+
+/* Detail drawer: the grouping already says the priority, so the P1/P2 chips are noise */
+.sm-priority{display:none}
+
+@media(max-width:760px){
+  .run-story{padding:12px 16px 24px}
+  .rs-kpis{grid-template-columns:1fr}
+  .rs-chapter{grid-template-columns:1fr;padding:14px}
+  .rs-decision-actions{width:100%}
+  .rs-decision-actions button{flex:1;justify-content:center}
+}
+
+/* Simple / Bar chart switch on each figure */
+.rs-figure-head{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rs-figure-head figcaption{margin:0}
+.rs-figure-switch{display:inline-flex;padding:2px;background:#edf1f6;border-radius:8px}
+.rs-figure-switch button{height:26px;padding:0 10px;border:0;border-radius:6px;color:#5b6c7d;background:transparent;font-size:12.5px;font-weight:600;cursor:pointer}
+.rs-figure-switch button.active{color:#041d3b;background:#fff;box-shadow:0 1px 3px rgba(4,29,59,.15)}
+
+/* Donut: part-to-whole with every slice labelled in the key */
+.sv-donut{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.sv-donut svg{width:180px;height:180px;flex:0 0 auto}
+.sv-donut circle{transition:stroke-width .12s ease;cursor:default}
+.sv-donut-value{fill:#041d3b;font-size:17px;font-weight:700}
+.sv-donut-label{fill:#5b6c7d;font-size:11.5px}
+.sv-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;min-width:240px}
+.sv-key li{padding:5px 8px;display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;column-gap:9px;border-radius:7px;font-size:13.5px}
+.sv-key li.active{background:#f1f5fa}
+.sv-key i{width:12px;height:12px;border-radius:3px}
+.sv-key span{color:#173650}
+.sv-key strong{color:#041d3b}
+.sv-key small{grid-column:2/-1;color:#5b6c7d;font-size:12px}
+
+/* Waffle: 100 squares, one per building */
+.sv-waffle{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.sv-waffle-grid{display:grid;grid-template-columns:repeat(10,14px);gap:3px}
+.sv-waffle-grid i{width:14px;height:14px;border-radius:3px;background:#e3e9f0}
+.sv-waffle-grid i.on{background:#2a78d6}
+.sv-waffle p{margin:0;max-width:30ch;color:#173650;font-size:15px;line-height:1.45}
+.sv-waffle strong{display:block;color:#041d3b;font-size:26px;letter-spacing:-.02em}
+
+/* Ladder: one row per flood size, in words, with the amount */
+.sv-ladder{display:flex;flex-direction:column;gap:6px;max-width:640px}
+.sv-ladder>div{padding:4px 8px;display:grid;grid-template-columns:200px minmax(0,1fr) 92px;align-items:center;gap:12px;border-radius:7px;font-size:13.5px}
+.sv-ladder>div.highlight{background:#eef4fc}
+.sv-ladder span{color:#173650}
+.sv-ladder strong{color:#041d3b;text-align:right}
+.sv-ladder-track{height:12px;background:#edf1f6;border-radius:6px;overflow:hidden}
+.sv-ladder-track i{display:block;height:100%;background:#2a78d6;border-radius:0 6px 6px 0}
+
+/* Checks: icon + word, never colour alone */
+.sv-checks{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 14px}
+.sv-checks li{padding:5px 0;display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:6px;border-bottom:1px solid #edf1f6;font-size:13px}
+.sv-checks span{color:#173650}
+.sv-checks em{font-style:normal;font-size:12px;font-weight:600;color:#5b6c7d}
+.sv-checks li.pass svg{color:#11845b}
+.sv-checks li.warn svg,.sv-checks li.warn em{color:#b97800}
+.sv-checks li.fail svg,.sv-checks li.fail em{color:#d03b3b}
+
+@media(max-width:760px){
+  .sv-ladder>div{grid-template-columns:1fr auto;row-gap:4px}
+  .sv-ladder-track{grid-column:1/-1;grid-row:2}
+  .sv-key{min-width:0;width:100%}
+}
+
+/* Flood sizes: every tier as a row, the picked one in detail, then score -> depth */
+.sv-tiers{display:flex;flex-direction:column;gap:14px}
+.sv-tiers h5{margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#041d3b;font-size:13.5px}
+.sv-tiers h5 small{color:#8a94a0;font-size:11.5px;font-weight:500}
+.sv-tier-list{display:flex;flex-direction:column;gap:4px;margin-top:-6px}
+.sv-tier-list button{padding:6px 8px;display:grid;grid-template-columns:minmax(0,1fr) auto;row-gap:5px;column-gap:10px;align-items:center;border:1px solid transparent;border-radius:8px;color:#173650;background:transparent;font-size:13px;text-align:left;cursor:pointer}
+.sv-tier-list button:hover{background:#f4f7fb}
+.sv-tier-list button.active{background:#eef4fc;border-color:#9ec5f4}
+.sv-tier-list .sv-ladder-track{grid-column:1/-1;grid-row:2;height:8px}
+.sv-tier-list strong{color:#041d3b;font-size:12.5px}
+.sv-tier-detail{padding:12px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;border-radius:10px}
+.sv-tier-detail .sv-waffle{gap:14px}
+.sv-tier-detail .sv-waffle p{font-size:13.5px}
+.sv-tier-detail .sv-waffle strong{font-size:22px}
+.sv-tier-detail .pl-figures{margin:0}
+.sv-suscept{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid #edf1f6}
+.sv-suscept p{margin:0;color:#5b6c7d;font-size:13px;line-height:1.5}
+.sv-hist{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-items:end}
+.sv-hist>div{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.sv-hist em{color:#041d3b;font-style:normal;font-size:12.5px;font-weight:700}
+.sv-hist-bar{width:100%;height:90px;display:flex;align-items:flex-end;background:#f4f7fb;border-radius:4px}
+.sv-hist-bar i{display:block;width:100%;border-radius:4px 4px 0 0}
+.sv-hist strong{color:#173650;font-size:11.5px;white-space:nowrap}
+.sv-hist small{color:#8a94a0;font-size:10.5px}
+.sv-hist-note{font-size:12px!important}
+
+/* Financial engine: worked building, waterfall, EP table, assumptions */
+.sv-fin{display:flex;flex-direction:column;gap:16px}
+.sv-fin-block{display:flex;flex-direction:column;gap:8px}
+.sv-fin-block+.sv-fin-block{padding-top:14px;border-top:1px solid #edf1f6}
+.sv-fin-block h5{margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#041d3b;font-size:13.5px}
+.sv-fin-block h5 small{color:#8a94a0;font-size:11.5px;font-weight:500}
+.sv-fin-note{margin:0;color:#5b6c7d;font-size:12.5px;line-height:1.5}
+.sv-chain{margin:0;padding:0;list-style:none;counter-reset:chain;display:flex;flex-direction:column}
+.sv-chain li{position:relative;padding:6px 0 6px 30px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;border-bottom:1px dashed #e3e9f0;counter-increment:chain}
+.sv-chain li:before{content:counter(chain);position:absolute;left:0;top:7px;width:20px;height:20px;display:grid;place-items:center;color:#fff;background:#1c5cab;border-radius:50%;font-size:11px;font-weight:700}
+.sv-chain span{color:#173650;font-size:13px}
+.sv-chain strong{color:#041d3b;font-size:13.5px;text-align:right}
+.sv-chain small{grid-column:1/-1;color:#5b6c7d;font-size:12px}
+.sv-rp-picker{display:flex;gap:4px;flex-wrap:wrap}
+.sv-rp-picker button{height:28px;padding:0 9px;border:1px solid #dfe6ee;border-radius:7px;color:#173650;background:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.sv-rp-picker button.active{color:#fff;background:#041d3b;border-color:#041d3b}
+.sv-waterfall{display:flex;flex-direction:column;gap:5px}
+.sv-waterfall>div{display:grid;grid-template-columns:minmax(0,1fr) auto;row-gap:3px;column-gap:10px;align-items:center;font-size:12.5px}
+.sv-waterfall span{color:#173650}
+.sv-waterfall strong{color:#041d3b;text-align:right}
+.sv-waterfall .less span,.sv-waterfall .less strong{color:#5b6c7d;font-weight:500}
+.sv-waterfall .net span,.sv-waterfall .net strong{font-weight:700}
+.sv-wf-track{position:relative;grid-column:1/-1;height:10px;background:#f4f7fb;border-radius:4px}
+.sv-wf-track i{position:absolute;top:0;bottom:0;border-radius:4px}
+.sv-waterfall .total .sv-wf-track i{background:#5598e7}
+.sv-waterfall .less .sv-wf-track i{background:#c5d0dc}
+.sv-waterfall .net .sv-wf-track i{background:#0d366b}
+.sv-ep{width:100%;border-collapse:collapse;font-size:12.5px}
+.sv-ep th,.sv-ep td{padding:5px 4px;text-align:right;border-bottom:1px solid #edf1f6}
+.sv-ep th:first-child,.sv-ep td:first-child{text-align:left}
+.sv-ep th{color:#5b6c7d;font-weight:600}
+.sv-ep tbody tr{cursor:pointer}
+.sv-ep tbody tr.active{background:#eef4fc}
+.sv-ep tfoot td{color:#041d3b;font-weight:600;border-bottom:0}
+.sv-assumed{padding:10px 12px!important;background:#fff8e6;border:0!important;border-radius:10px}
+.sv-assumed h5{color:#7a5300}
+.sv-assumed ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px;color:#173650;font-size:12.5px;line-height:1.45}
+/* Decision at the top of the summary, as well as at the end */
+.rs-quick-decision{margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rs-quick-decision span{flex:1;color:#b9c7d8;font-size:13px;font-weight:600}
+.rs-quick-decision button{height:36px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.35);border-radius:9px;color:#fff;background:transparent;font-size:14px;font-weight:600;cursor:pointer}
+.rs-quick-decision button.primary{color:#041d3b;background:#fff;border-color:#fff}
+.rs-quick-decision button:disabled{opacity:.5;cursor:not-allowed}

@@ -2,7 +2,9 @@
 
 Backend for the Furika AI catastrophe-modelling frontend. Portfolio, property, upload, chat and model-run routes read PostgreSQL. Model runs calculate score-to-depth, vulnerability, property-loss, EP and AAL from confirmed uploaded properties and publish results after review. Chat retrieves selected uploaded rows and document text, then tries Claude, Gemini, and OpenAI GPT-5.6 Luna in that order. Some other routes still expose prototype behavior.
 
-Pasted placement memoranda and selected uploaded placement documents receive separate offer-specific checks for data extraction, hazard intensity, vulnerability, financial loss, accumulation and underwriting flags. `/chat` returns these as `offerChecks` with per-stage results and blocked reasons. They are not portfolio model runs or coverage approvals; an underwriter must review the offer.
+Pasted placement memoranda and selected uploaded placement documents receive separate offer-specific checks for data extraction, hazard intensity, vulnerability, financial loss and underwriting flags. `/chat` returns these as `offerChecks` with per-stage results and blocked reasons. They are not portfolio model runs or coverage approvals; an underwriter must review the offer. Portfolio accumulation is not calculated for a single offer unless the underwriter explicitly asks to compare it with nearby insured properties.
+
+For a follow-up about one offer, send the new question in `message` and carry **only that offer** in `context.offerText` (pasted offer) or `context.offerUploadId` (uploaded document). Do not attach the insured-properties CSV. If a supplied offer context is empty or invalid, the API returns an error instead of silently answering from portfolio data. Site hazard scoring may still use the separate scored geographic reference grid; it does not turn other insured properties into the offer's exposure.
 
 ## Quick start
 
@@ -93,6 +95,7 @@ All versioned endpoints use `/api/v1`.
 | GET | `/portfolios/{id}/review-queue` | Rows needing review and unconfirmed properties |
 | POST | `/upload-rows/{id}/decision` | `confirm` / `reject` / `edit` a staged row |
 | GET | `/locations/geocode?q=...` | Google geocoding (needs `GOOGLE_MAPS_API_KEY`) with precision |
+| GET | `/locations/flood-reference` | Fixed Nairobi susceptibility points and named hotspots for the Accumulation base map |
 | GET/POST | `/model-runs` | Resume latest portfolio run / calculate a new run for review |
 | GET | `/model-runs/{id}` | Workflow status and stages |
 | GET | `/model-runs/{id}/events` | Server-Sent Event stream |
@@ -106,7 +109,7 @@ All versioned endpoints use `/api/v1`.
 | POST | `/modelling/ep-curve` | Build/interpolate the occurrence EP curve and AAL range |
 | POST | `/modelling/hotspot-uplift` | Calculate distance-decayed hotspot uplift |
 | POST | `/modelling/sensitivity` | Run D-max sensitivity scenarios |
-| POST | `/chat` | Answer from selected upload IDs or a portfolio property ID; Gemini then Claude fallback |
+| POST | `/chat` | Answer from one offer, selected upload IDs, or a portfolio property ID; Claude, Gemini, then OpenAI fallback |
 | GET/POST | `/chats` | Recent chats/create chat |
 | GET/POST | `/chats/{id}/messages` | Read/append messages |
 | DELETE | `/chats/{id}` | Delete chat |

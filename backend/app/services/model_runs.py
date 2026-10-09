@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from ..extensions import db
+from . import decisions
 from ..models import Approval, HazardResult, LossResult, ModelRun, Portfolio, Property, RunStage, new_id
 from . import furika_model as model
 from .run_trace import RunFailed, RunTrace
@@ -175,7 +176,7 @@ def get(run_id: str) -> dict | None:
     return serialize(run) if run else None
 
 
-def decide(run_id: str, action: str, comment: str | None) -> dict:
+def decide(run_id: str, action: str, comment: str | None, decided_by: str = "unknown") -> dict:
     trace = RunTrace(f"model_run.{action}", expected=(RunError,), run=run_id)
     with trace.step("load_run") as info:
         run = db.session.get(ModelRun, run_id)
@@ -187,6 +188,11 @@ def decide(run_id: str, action: str, comment: str | None) -> dict:
     now = datetime.now(UTC)
     with trace.step("record_decision"):
         db.session.add(Approval(model_run_id=run.id, action=action, comment=comment))
+        summary = (run.configuration or {}).get("summary", {})
+        decisions.record(subject_type="model_run", subject_ref=f"run:{run.id}", subject_label=f"Portfolio {run.portfolio_id} · {run.id}",
+                         action="approve" if action == "approve" else "send_back", decided_by=decided_by, comment=comment,
+                         portfolio_id=run.portfolio_id, commit=False,
+                         snapshot={key: summary.get(key) for key in ("propertyCount", "totalTivKes", "aalKes", "tierLosses") if key in summary})
         review = RunStage.query.filter_by(model_run_id=run.id, stage_key="human_review").one()
     if action == "approve":
         if HazardResult.query.filter_by(model_run_id=run.id).count() == 0:  # runs created before draft results existed

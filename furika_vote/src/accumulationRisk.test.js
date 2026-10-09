@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFloodOverlay, floodColour, FLOOD_TIERS } from './accumulationRisk.js';
+import { assessAgainstNairobiReference, buildFloodOverlay, floodColour, FLOOD_TIERS } from './accumulationRisk.js';
 
 test('scenario order follows increasing return periods, not tier names', () => {
   assert.deepEqual(FLOOD_TIERS.map((tier) => tier.years), [10, 25, 50, 100, 250]);
@@ -32,4 +32,20 @@ test('overlay only uses scores for the selected scenario and valid map coordinat
   assert.equal(buildFloodOverlay(properties, 'extreme', null, 'neighbourhood').cells[0].score, 0.1);
   assert.equal(buildFloodOverlay(properties, 'common', null, 'neighbourhood').cells[0].score, 0.9);
   assert.equal(floodColour(0.8), '#c7353d');
+});
+
+test('an uploaded asset is compared with the fixed Nairobi reference, not used as the base layer', () => {
+  const points = [{ latitude: -1.2584, longitude: 36.8554, hazardScores: { severe: 0.8 } }];
+  const hotspots = [{ name: 'Mathare', latitude: -1.2585, longitude: 36.8555 }];
+  const asset = { latitude: -1.2584, longitude: 36.8554, hazardScores: { severe: 0.2 } };
+  const result = assessAgainstNairobiReference(asset, points, hotspots, 'severe');
+  assert.equal(result.referenceScore, 0.8);
+  assert.equal(result.sourceScore, 0.2);
+  assert.equal(result.nearestReferenceKm, 0);
+  assert.equal(result.nearestHotspot.name, 'Mathare');
+  assert.equal(buildFloodOverlay(points, 'severe', null, 'neighbourhood').affectedCount, 1);
+  assert.equal(assessAgainstNairobiReference({ latitude: null, longitude: 36.8 }, points, hotspots, 'severe'), null);
+  const far = assessAgainstNairobiReference({ latitude: -1.30, longitude: 36.90 }, points, hotspots, 'severe');
+  assert.equal(far.approximate, true);
+  assert.ok(far.nearestReferenceKm > 0.5);
 });
