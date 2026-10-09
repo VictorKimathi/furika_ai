@@ -41,9 +41,19 @@ class Config:
     MAX_CONTENT_LENGTH = UPLOAD_MAX_BYTES + 1024 * 1024
     AI_MAPPING_AUTO_CONFIRM = 0.9
     INGESTION_ASYNC = True  # documents are extracted in a background thread
+    REPORT_OWNER_EMAIL = os.getenv("REPORT_OWNER_EMAIL", "")
+    REPORT_EMAIL_ENABLED = os.getenv("REPORT_EMAIL_ENABLED", "true").lower() == "true"
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASS = os.getenv("SMTP_PASS", "")
+    EMAIL_FROM = os.getenv("EMAIL_FROM", "")
+    SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
+    SMTP_STARTTLS = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
 
 
 class TestingConfig(Config):
     TESTING = True
     INGESTION_ASYNC = False
+    REPORT_EMAIL_ENABLED = False
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"

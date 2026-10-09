@@ -91,12 +91,18 @@ Then edit `.env`. Only `DATABASE_URL` and `SECRET_KEY` are needed to start; the 
 | `GOOGLE_MAPS_API_KEY` | Optional | Server-side Geocoding API key: places uploaded buildings that have an address but no coordinates. Restrict it by IP and to the Geocoding API |
 | `CORS_ORIGINS` | If the frontend is not on `http://localhost:5173` | Comma-separated list of frontend origins allowed to call the API |
 | `STORAGE_ROOT` | Optional | Folder for original uploaded files. Defaults to `backend/storage` |
+| `REPORT_OWNER_EMAIL` | For report email | Owner who receives each approved model report. Set this explicitly in the local `.env`; no recipient is assumed for new installations |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | For report email | Outgoing mail server and sender credentials; without these, approval still works but delivery is marked not configured |
+| `SMTP_STARTTLS`, `SMTP_USE_SSL` | Optional | Transport security. Defaults to STARTTLS on port 587; use SSL for port 465 |
+| `REPORT_EMAIL_ENABLED` | Optional | Set `false` to disable automatic report email |
 | `LOG_LEVEL` | Optional | `INFO` (default) or `DEBUG` |
 | `HOST`, `PORT`, `FLASK_DEBUG` | Optional | Used by `python run.py`. Defaults: `0.0.0.0`, `5000`, `false` |
 
 Without any AI key the backend still works: spreadsheets upload and model runs calculate, chat replies with a data-only summary, and PDF and Word uploads are stored but not read.
 
 Keep `.env` out of Git (it is already ignored) and never copy these keys into a `VITE_` variable in the frontend: those are visible to anyone using the site.
+
+Reports are emailed only after a human approves the model run. The email includes the full report as HTML, with the EP curve and per-stage results, plus a JSON attachment. If delivery fails, the run remains approved; the Report tab shows the status and an **Email owner** retry button. A previously approved report can also be sent from that tab.
 
 ## 6. Create the tables
 

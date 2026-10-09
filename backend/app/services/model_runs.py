@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 
 import pandas as pd
 
 from ..extensions import db
-from . import decisions
+from . import decisions, report_email
 from ..models import Approval, HazardResult, LossResult, ModelRun, Portfolio, Property, RunStage, new_id
 from . import furika_model as model
 from .run_trace import RunFailed, RunTrace
@@ -23,6 +24,7 @@ STAGES = [
     ("human_review", "Human review gate"),
     ("publish", "Approved model run"),
 ]
+log = logging.getLogger("app.model_runs")
 
 
 class RunError(ValueError):
@@ -211,8 +213,16 @@ def decide(run_id: str, action: str, comment: str | None, decided_by: str = "unk
         review.status = "failed"
     with trace.step("commit"):
         db.session.commit()
+    delivery = None
+    if action == "approve":
+        try:
+            delivery = report_email.deliver(run)
+        except Exception as exc:  # approval was already committed; mail must not turn it into a failed decision
+            db.session.rollback()
+            log.error("Post-approval report email failed run=%s error_type=%s", run_id, type(exc).__name__)
+            delivery = {"status": "failed", "message": "Email delivery failed; retry from the Report tab."}
     return {"runId": run.id, "action": action, "comment": comment, "status": run.status, "decidedAt": now.isoformat(), "dummy": False,
-            "trace": trace.finish(status=run.status)}
+            "reportDelivery": delivery, "trace": trace.finish(status=run.status)}
 
 
 def latest_approved(portfolio_id: str) -> ModelRun | None:

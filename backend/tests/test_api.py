@@ -102,18 +102,28 @@ def test_model_run_and_decision(seeded):
     assert run_response.json["dummy"] is False
     assert run_response.json["configuration"]["summary"]["propertyCount"] > 0
     run_id = run_response.json["id"]
+    assert api_client.get(f"/api/v1/model-runs/{run_id}/report").status_code == 409
     decision = api_client.post(
         f"/api/v1/model-runs/{run_id}/decision",
         json={"action": "approve", "comment": "Reviewed"},
     )
     assert decision.status_code == 200
     assert decision.json["status"] == "approved"
+    assert decision.json["reportDelivery"]["status"] == "not_configured"
     summary = api_client.get("/api/v1/portfolios/SYN-PORT-142/summary")
     assert summary.json["portfolioAalKes"] is not None
     property_response = api_client.get("/api/v1/properties/NBO-0002")
     assert property_response.json["loss"]["loss100Kes"] is not None
     report = api_client.get(f"/api/v1/model-runs/{run_id}/report")
     assert report.status_code == 200
+    body = report.json
+    assert body["runId"] == run_id
+    assert list(body["stages"]) == ["ingestion", "hazard", "vulnerability", "exposure", "financial", "ai", "portfolio", "trust"]
+    assert [point["returnPeriodYears"] for point in body["epCurve"]] == [10, 25, 50, 100, 250]
+    assert all(point["annualExceedanceProbability"] == 1 / point["returnPeriodYears"] for point in body["epCurve"])
+    assert all(point["groundUpKes"] >= point["grossKes"] >= point["netKes"] for point in body["epCurve"])
+    assert body["financial"]["aalRangeKes"]["low"] <= body["financial"]["aalRangeKes"]["central"] <= body["financial"]["aalRangeKes"]["high"]
+    assert body["financial"]["assumptions"]["tierRp"]
     latest = api_client.get("/api/v1/model-runs?portfolioId=SYN-PORT-142")
     assert latest.json["items"][0]["status"] == "approved"
 

@@ -43,6 +43,7 @@ function floodTiers(get) {
   if (!footprint) return null;
   const depth = get('HAZ-04')?.chart;
   const scores = get('HAZ-01')?.chart;
+  const financialCurve = get('FIN-14')?.chart || get('FIN-04')?.chart;
   const dMax = get('HAZ-10')?.value ?? 4;
   const series = (chart, name) => chart?.series?.find((item) => item.name === name)?.values || [];
   const at = (labels, n) => (labels || []).findIndex((label) => years(label) === n);
@@ -63,7 +64,7 @@ function floodTiers(get) {
     };
   });
   const standard = tiers.findIndex((tier) => tier.years === '100');
-  return { type: 'floodTiers', dMax, tiers, defaultIndex: standard >= 0 ? standard : tiers.length - 1 };
+  return { type: 'floodTiers', dMax, tiers, epCurve: financialCurve, defaultIndex: standard >= 0 ? standard : tiers.length - 1 };
 }
 
 // Financial engine: one building worked through, then ground-up -> gross -> net for every flood size, with the assumptions.

@@ -3,7 +3,7 @@ import json
 from flask import Response, request, stream_with_context
 from flask_restx import Namespace, Resource
 
-from ..services import model_runs, run_metrics
+from ..services import model_runs, report_email, run_metrics, run_reports
 from ..services.run_trace import RunFailed
 from ..extensions import db
 from ..models import ModelRun
@@ -124,6 +124,20 @@ class ModelRunCancelResource(Resource):
         ns.abort(409, "Only runs awaiting review are stored. Return the run for revision instead.")
 
 
+@ns.route("/<string:run_id>/report/email")
+class ModelRunReportEmailResource(Resource):
+    @ns.response(404, "Run not found", error_model)
+    @ns.response(409, "Run is not approved", error_model)
+    def post(self, run_id):
+        """Retry delivery of an approved report to the configured owner; never accept a recipient from the request."""
+        run = db.session.get(ModelRun, run_id)
+        if run is None:
+            ns.abort(404, f"Model run {run_id} was not found.")
+        if run.status != "approved":
+            ns.abort(409, "Approve the model run before emailing its report.")
+        return {"runId": run.id, "reportDelivery": report_email.deliver(run)}
+
+
 @ns.route("/<string:run_id>/stages/<string:stage_id>/output")
 class ModelRunStageOutputResource(Resource):
     @ns.response(404, "Run or stage not found", error_model)
@@ -148,4 +162,8 @@ class ModelRunReportResource(Resource):
             ns.abort(409, "The report is available only after approval.")
         if request.args.get("format", "json") != "json":
             ns.abort(400, "Only JSON report export is implemented.")
-        return {"runId": run_id, "status": "approved", "summary": result["configuration"].get("summary", {}), "dummy": False}
+        run = db.session.get(ModelRun, run_id)
+        try:
+            return run_reports.build(run)
+        except run_metrics.MetricsError as exc:
+            ns.abort(422, str(exc))

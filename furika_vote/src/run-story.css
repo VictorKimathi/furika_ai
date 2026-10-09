@@ -67,6 +67,7 @@
 .workflow-view-switch{display:inline-flex;padding:3px;background:#edf1f6;border-radius:9px}
 .workflow-view-switch button{height:28px;padding:0 12px;border:0;border-radius:7px;color:#5b6c7d;background:transparent;font-size:13px;font-weight:600;cursor:pointer}
 .workflow-view-switch button.active{color:#041d3b;background:#fff;box-shadow:0 1px 3px rgba(4,29,59,.15)}
+.workflow-view-switch button:disabled{opacity:.45;cursor:not-allowed}
 
 /* Detail drawer: the grouping already says the priority, so the P1/P2 chips are noise */
 .sm-priority{display:none}

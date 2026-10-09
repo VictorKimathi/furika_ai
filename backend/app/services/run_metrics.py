@@ -33,8 +33,8 @@ LIMITATIONS = [
     "Depth = score x D_max is an assumption; D_max defaults to 4 m.",
     "Vulnerability curves are adapted from JRC/Huizinga references and are not calibrated to Kenyan claims.",
     "Five scenario tiers are not a stochastic event set; AAL is reported as a range.",
-    "Losses are ground-up: policy terms and reinsurance are not applied.",
-    "The portfolio is synthetic; no real client data is modelled.",
+    "Gross and net losses use illustrative policy and reinsurance terms, not supplied contracts.",
+    "Exposure is synthetic or redacted and has not been validated against an actual cedant book.",
 ]
 STAGE_INFO = {
     "ingestion": ("0 Data entry", "Uploaded files (CSV, Excel, PDF, text)", "Validated property table, document index, provenance log", "ING-02"),
@@ -342,6 +342,8 @@ def _vulnerability(frame: pd.DataFrame, result: dict) -> list[dict]:
 
 def _lorenz(values: list[float], points: int = 21) -> tuple[list, list]:
     ordered = sorted(values, reverse=True)
+    if not ordered:
+        return [], []
     total = sum(ordered) or 1
     cumulative = np.cumsum(ordered) / total
     xs = [round(i / (points - 1), 3) for i in range(points)]
@@ -416,7 +418,8 @@ def _financial(frame: pd.DataFrame, result: dict, run: ModelRun) -> list[dict]:
                       chart={"type": "line", "x": [num(v) for v in curve["rp"]], "series": [{"name": "Loss (KES m)", "values": [num(v / 1e6) for v in curve["loss_kes"]]}], "unit": "KES m", "xLabel": "Return period (years, log scale)", "yLabel": "Loss (KES m)", "logX": True}))
     out.append(metric("FIN-05", "AAL range", "Model + Assumed", "P1", num(aal["aal_central"]), f"{kes(aal['aal_low'])} – {kes(aal['aal_high'])} (central {kes(aal['aal_central'])})",
                       plain="Average yearly flood cost over the long run (shown as a range)",
-                      chart={"type": "bar", "categories": ["low", "central", "high"], "series": [{"name": "AAL (KES m)", "values": [num(aal[k] / 1e6) for k in ("aal_low", "aal_central", "aal_high")]}], "unit": "KES m"}))
+                      chart={"type": "bar", "categories": ["low", "central", "high"], "series": [{"name": "AAL (KES m)", "values": [num(aal[k] / 1e6) for k in ("aal_low", "aal_central", "aal_high")]}], "unit": "KES m"},
+                      data={"low": num(aal["aal_low"]), "central": num(aal["aal_central"]), "high": num(aal["aal_high"])}))
     out.append(metric("FIN-06", "AAL rate", "Model", "P1", num(aal["aal_central"] / total), permille(aal["aal_central"] / total), plain="Average yearly cost as a share of insured value"))
     out.append(metric("FIN-07", "PML view", "Model", "P1", num(l100 / total), f"1 in 100: {pct(l100 / total)} · 1 in 250: {pct(l250 / total)} of TIV"))
     tail = l250 / l100 if l100 else None
@@ -604,8 +607,9 @@ def _portfolio(frame: pd.DataFrame, result: dict, run: ModelRun) -> list[dict]:
     values = [float(row[0] or 0) for row in aal]
     xs, ys = _lorenz(values)
     riskiest = sum(values[: max(1, len(values) // 10)]) / (sum(values) or 1) if values else None
-    out.append(metric("PORT-05", "Cumulative AAL", "Model", "P2", num(riskiest), f"riskiest 10% of properties carry {pct(riskiest)} of AAL" if riskiest is not None else "n/a",
-                      chart={"type": "line", "x": xs, "series": [{"name": "cumulative % of AAL", "values": ys}], "unit": "%", "xLabel": "% of properties (riskiest first)", "yLabel": "% of AAL"}))
+    out.append(metric("PORT-05", "Cumulative AAL", "Model", "P2", num(riskiest), f"riskiest 10% of properties carry {pct(riskiest)} of AAL" if riskiest is not None else "Not measured yet",
+                      note=None if values else "No per-property AAL results are available for this run.",
+                      chart={"type": "line", "x": xs, "series": [{"name": "cumulative % of AAL", "values": ys}], "unit": "%", "xLabel": "% of properties (riskiest first)", "yLabel": "% of AAL"} if values else None))
     losses = result["losses"].merge(pd.DataFrame({"loc_id": frame["loc_id"]}), on="loc_id")
     data = frame[["loc_id"]].assign(cluster=_cluster_labels(frame))
     merged = losses.merge(data, on="loc_id")

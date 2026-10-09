@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Check, CircleX } from 'lucide-react';
 import { CLASS_NAMES, kes, pct } from './runStory.js';
+import { Chart } from './StageMetrics.jsx';
 import './run-story.css';
 
 // Plain-language pictures for the summary: one per chapter, each readable without knowing how to read an axis.
@@ -80,6 +81,7 @@ function FloodTiers({ visual }) {
       </div>)}</div>
       {dry != null && <p className="sv-hist-note">Buildings by water depth in this flood. {dry.toLocaleString('en-KE')} more stay dry.</p>}
     </div>}
+    {visual.epCurve && <div className="sv-ep-curve"><h5>Loss against rarity <small>exceedance probability (EP) curve</small></h5><Chart chart={visual.epCurve}/></div>}
   </div>;
 }
 

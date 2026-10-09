@@ -96,7 +96,8 @@ The API is rooted at `/api/v1`. Important endpoints are:
 - `POST /model-runs`: calculate a new draft model run.
 - `GET /model-runs/{id}/events`: stream run progress.
 - `POST /model-runs/{id}/decision`: approve or return the run.
-- `GET /model-runs/{id}/report`: retrieve an approved report.
+- `GET /model-runs/{id}/report`: retrieve an approved JSON report with the EP curve, financial waterfall, AAL by layer, assumptions, limitations and results for every workflow stage. The frontend Report tab can also download a PDF.
+- `POST /model-runs/{id}/report/email`: deliver or retry an approved report to the configured owner email. Approval triggers the first attempt automatically; delivery failure does not revoke approval.
 - `POST /chat`: answer questions using selected database evidence and model results.
 
 ## Tools and technologies used

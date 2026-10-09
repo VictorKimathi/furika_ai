@@ -175,6 +175,7 @@ decision_response = api.model("RunDecisionResponse", {
     "status": fields.String,
     "decidedAt": fields.DateTime,
     "dummy": fields.Boolean,
+    "reportDelivery": fields.Raw(description="Email status, configured owner recipient and send time; null for returned runs."),
     "trace": fields.Raw,
 })
 
